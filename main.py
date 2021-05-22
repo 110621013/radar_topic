@@ -343,15 +343,83 @@ def k_mean_convectivecell_marking():
 
         con += 1
 
+# print pearson score (10+2 vs 12 / 11+1 vs 12)
+def pearson():
+    print('----> pearson gogo')
+    # read grd
+    dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
+    dbz_21_11_1h = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[6, 0, :, :]
+    dbz_21_10_2h = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[12, 0, :, :]
+    mean_obs = dbz_21_12_obs.mean()
+    mean_1h = dbz_21_11_1h.mean()
+    mean_2h = dbz_21_10_2h.mean()
+
+    up, down1, down2 = 0, 0, 0
+    for j in range(y_num) :
+        for i in range(x_num) :
+            up += (dbz_21_11_1h[j,i]-mean_1h)*(dbz_21_12_obs[j,i]-mean_obs)
+            down1 += (dbz_21_11_1h[j,i]-mean_1h)**2
+            down2 += (dbz_21_12_obs[j,i]-mean_obs)**2
+    pearson_dbz_1h = up/(((down1)**0.5)*((down2)**0.5))
+
+    up, down1, down2 = 0, 0, 0
+    for j in range(y_num) :
+        for i in range(x_num) :
+            up += (dbz_21_10_2h[j,i]-mean_2h)*(dbz_21_12_obs[j,i]-mean_obs)
+            down1 += (dbz_21_10_2h[j,i]-mean_2h)**2
+            down2 += (dbz_21_12_obs[j,i]-mean_obs)**2
+    pearson_dbz_2h = up/(((down1)**0.5)*((down2)**0.5))
+
+
+    rr_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 1, :, :]
+    rr_21_11_1h = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[6, 1, :, :]
+    rr_21_10_2h = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[12, 1, :, :]
+    mean_obs = rr_21_12_obs.mean()
+    mean_1h = rr_21_11_1h.mean()
+    mean_2h = rr_21_10_2h.mean()
+
+    up, down1, down2 = 0, 0, 0
+    for j in range(y_num) :
+        for i in range(x_num) :
+            up += (rr_21_11_1h[j,i]-mean_1h)*(rr_21_12_obs[j,i]-mean_obs)
+            down1 += (rr_21_11_1h[j,i]-mean_1h)**2
+            down2 += (rr_21_12_obs[j,i]-mean_obs)**2
+    pearson_rr_1h = up/(((down1)**0.5)*((down2)**0.5))
+
+    up, down1, down2 = 0, 0, 0
+    for j in range(y_num) :
+        for i in range(x_num) :
+            up += (rr_21_10_2h[j,i]-mean_2h)*(rr_21_12_obs[j,i]-mean_obs)
+            down1 += (rr_21_10_2h[j,i]-mean_2h)**2
+            down2 += (rr_21_12_obs[j,i]-mean_obs)**2
+    pearson_rr_2h = up/(((down1)**0.5)*((down2)**0.5))
+
+    print('pearson_dbz_1h:', pearson_dbz_1h)
+    print('pearson_dbz_2h:', pearson_dbz_2h)
+    print('pearson_rr_1h:', pearson_rr_1h)
+    print('pearson_rr_2h:', pearson_rr_2h)
+
+# print moment score (10+2 vs 12 / 11+1 vs 12)
+def moment():
+    print('----> moment gogo')
+    print('等憶彤code弄好')
+
+
+
 if __name__ == '__main__':
     # data_source : ..
     check_output_folder()
 
-    create_NCDR_maple_img(delete_png_flag=False)
-    compare_forecasts_effectiveness()
+    #create_NCDR_maple_img(delete_png_flag=False)
+    #compare_forecasts_effectiveness()
 
-    k_mean_convectivecell_marking()
+    #k_mean_convectivecell_marking()
+
+    pearson()
+    moment()
 
     # TODO
-    # k-mean convection mark -> linear nowcasting
-    # convLSTM nowcasting
+    # 0.code整合上github
+    # 1.完善kmean的數個可改進方向()
+    # 2.完成線性外延（期待有產出）
+    # 3.深度學習資料確認與convLSTM模型初探
