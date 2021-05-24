@@ -72,13 +72,61 @@ delta_colors = [ # deep blue - white - deep red
     "#CE0000",
     "#750000",
 ]
+score_colors = [
+    '#FF0000',
+    '#FF0000',
+    '#28FF28',
+    '#28FF28',
+    '#009999A9',
+    '#009999A9',
+    '#CEFFCd',
+    '#CEFFCd',
+]
 
 
-# arg: path+filename, return nparray(t, var, y, x)
+# arg: path+filename, return data nparray(t, var, y, x)
 def read_grd(filename):
     data = np.fromfile(filename, dtype="<f4")
     data = data.reshape((t_num, v_num, y_num, x_num), order='C')
     return data
+# arg: data nparray(y, x) + check threshold + noise delta, return fixed data nparray(y, x)
+def filterout_localnoise(data, threshold, delta):
+    for j in range(data.shape[0]):
+        for i in range(data.shape[1]):
+            if data[j, i] >= threshold:
+                is_noise_flag = False
+                if j != 0:
+                    if abs(data[j, i] - data[j-1, i]) > delta:
+                        is_noise_flag = True
+                if j != data.shape[0]-1:
+                    if abs(data[j, i] - data[j+1, i]) > delta:
+                        is_noise_flag = True
+                if i != 0:
+                    if abs(data[j, i] - data[j, i-1]) > delta:
+                        is_noise_flag = True
+                if i != data.shape[1]-1:
+                    if abs(data[j, i] - data[j, i+1]) > delta:
+                        is_noise_flag = True
+
+                if is_noise_flag:
+                    data[j, i] = 0.0
+                    con = 0
+                    if j != 0:
+                        data[j, i] += data[j-1, i]
+                        con += 1
+                    if j != data.shape[0]-1:
+                        data[j, i] += data[j+1, i]
+                        con += 1
+                    if i != 0:
+                        data[j, i] += data[j, i-1]
+                        con += 1
+                    if i != data.shape[1]-1:
+                        data[j, i] += data[j, i+1]
+                        con += 1
+                    data[j, i] /= con
+    return data
+
+
 # check all folder we need
 def check_output_folder():
     check_folder_list = [
@@ -87,10 +135,13 @@ def check_output_folder():
         os.path.join('.', 'data_output_img', 'rr'),
         os.path.join('.', 'data_output_img', 'RMSE'),
         os.path.join('.', 'data_output_img', 'k_mean'),
+        os.path.join('.', 'data_output_img', 'k_mean_v2'),
+        os.path.join('.', 'data_output_img', 'score'),
     ]
     for folder in check_folder_list:
         if os.path.exists(folder) == False:
             os.mkdir(folder)
+
 
 
 # arg: dbzname, dbzfield, savepath, make contourf image
@@ -133,9 +184,25 @@ def plot_basic_contourf(dataname, datafield, title, savepath, savename):
         norm = BoundaryNorm(levels, 12)
         delta_colormap = ListedColormap(delta_colors)
         plot = ax.contourf(X, Y, datafield, extend='max', levels=levels, norm=norm, cmap=delta_colormap)
-    cbar = plt.colorbar(plot)
-    cbar.set_label(dataname, rotation=0, labelpad=-25, y=1.05)
-    cbar.set_ticks(levels)
+    elif dataname == 'index':
+        levels = [-0.25,0.0,0.25,0.5,0.75,1.0,1.25,1.5,1.75]
+        norm = BoundaryNorm(levels, 8)
+        score_colormap = ListedColormap(score_colors)
+        plot = ax.contourf(X, Y, datafield, extend='max', levels=levels, norm=norm, cmap=score_colormap)
+
+
+    if dataname == 'index':
+        cbar = plt.colorbar(plot, ticks=[0, 0.5, 1, 1.5])
+        cbar.set_label(dataname, rotation=0, labelpad=-70, y=1.05)
+        cbar.ax.set_yticklabels(['hits', 'misses', 'false alarm', 'correct\nnegatives'])
+    else:
+        cbar = plt.colorbar(plot)
+        cbar.set_label(dataname, rotation=0, labelpad=-25, y=1.05)
+        cbar.set_ticks(levels)
+
+    # special case
+    #if dataname == 'index':
+    #    cbar.set_ticks(['hits', 'misses', 'false alarm', 'correct negatives'])
 
     plt.savefig(os.path.join(savepath, savename))
     plt.close()
@@ -174,13 +241,11 @@ def plot_deltafield_RMSE(data, data_bar, time_interval_name):
     plot_basic_contourf('delta_dbz', delta_dbz_field, title, savepath, savename)
 
 
-############################################################################ TODO: dbz plot
-
 # calculate (x, y)<->(kx, ky) distance
 def dis(x, y, kx, ky):
     return int(((kx-x)**2 + (ky-y)**2)**0.5)
 # k-means grouping
-def kmeans(x, y, kx, ky, dot_num, seed_num, con, fig):
+def kmeans(x, y, kx, ky, dot_num, seed_num, savepath, con, fig):
     # grouping each element
     group = []
     for i in range(seed_num):
@@ -210,7 +275,6 @@ def kmeans(x, y, kx, ky, dot_num, seed_num, con, fig):
             sumx, sumy = 0, 0
 
     # plot kmean point
-    save_path = os.path.join('.', 'data_output_img', 'k_mean')
     cx, cy = [], []
     line = plt.gca()
     line.set_xlim([0, x_num])
@@ -227,7 +291,7 @@ def kmeans(x, y, kx, ky, dot_num, seed_num, con, fig):
     #k_feature = plt.scatter(kx, ky, s=50)
     cbar = plt.colorbar(feature) # <--just for alignment
     nk_feaure = plt.scatter(np.array(nkx), np.array(nky), s=50)
-    plt.savefig(os.path.join(save_path, 'kmeans_{}_t{}.png'.format(str(con), str(fig))))
+    plt.savefig(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(str(con), str(fig))))
     plt.close()
 
     # determine whether the grouping center is no longer changed
@@ -235,7 +299,7 @@ def kmeans(x, y, kx, ky, dot_num, seed_num, con, fig):
         return fig
     else:
         fig += 1
-        fig = kmeans(x, y, nkx, nky, dot_num, seed_num, con, fig)
+        fig = kmeans(x, y, nkx, nky, dot_num, seed_num, savepath, con, fig)
     return fig
 
 
@@ -274,8 +338,15 @@ def compare_forecasts_effectiveness():
 # do k-mean for all files and plot
 def k_mean_convectivecell_marking():
     seed_num, con = 10, 0
+    threshold = 40.0
+    kernel_list = []
     kx, ky = np.random.randint(0, x_num, seed_num), np.random.randint(0, y_num, seed_num)
-    ####################
+    savepath = os.path.join('.', 'data_output_img', 'k_mean')
+
+    # clean kmean old_file
+    old_file_list = os.listdir(savepath)
+    for f in old_file_list:
+        os.remove(os.path.join(savepath, f))
 
     # read grd
     dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
@@ -308,7 +379,6 @@ def k_mean_convectivecell_marking():
                 break
         '''
         # version2: threshold -> dbzfield>0
-        threshold = 40.0 ####################
         x, y = [], []
         for j in range(dbzfield.shape[0]):
             for i in range(dbzfield.shape[1]):
@@ -318,19 +388,13 @@ def k_mean_convectivecell_marking():
         dot_num = len(x)
 
         print('---> threshold, dot_num, seed_num:', threshold, dot_num, seed_num)
-        savepath = os.path.join('.', 'data_output_img', 'k_mean')
-
-        # clean old data
-        for root, dirs, files in os.walk(savepath):
-            for name in files:
-                os.remove(os.path.join(root, name))
 
         # plot basic dbz image to overlay
         title = 'dbz {} to overlay'.format(str(con))
         savename = 'dbz{}'.format(str(con))
         plot_basic_contourf('dbz', dbzfield, title, savepath, savename)
         # call kmeans to plot
-        final_fig = kmeans(x, y, kx, ky, dot_num=dot_num, seed_num=seed_num, con=con, fig=0)
+        final_fig = kmeans(x, y, kx, ky, dot_num=dot_num, seed_num=seed_num, savepath=savepath, con=con, fig=0)
 
         # overlay
         dbz_layer = plt.imread(os.path.join(savepath, savename+'.png'))
@@ -343,7 +407,87 @@ def k_mean_convectivecell_marking():
 
         con += 1
 
-# print pearson score (10+2 vs 12 / 11+1 vs 12)
+# do k-mean for all files and plot, version 2(add filter, clean folder)
+def k_mean_convectivecell_marking_v2():
+    seed_num, con = 10, 0
+    threshold = 40.0
+    kernel_list = []
+    kx, ky = np.random.randint(0, x_num, seed_num), np.random.randint(0, y_num, seed_num)
+    savepath = os.path.join('.', 'data_output_img', 'k_mean_v2')
+
+    # clean kmean old_file
+    old_file_list = os.listdir(savepath)
+    for f in old_file_list:
+        os.remove(os.path.join(savepath, f))
+
+    # read grd
+    dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
+    dbz_21_11_1h = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[6, 0, :, :]
+    dbz_21_10_2h = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[12, 0, :, :]
+    dbz_dict = {
+        'dbz_21_12_obs':dbz_21_12_obs,
+        'dbz_21_11_1h':dbz_21_11_1h,
+        'dbz_21_10_2h':dbz_21_10_2h,
+    }
+
+    for dbzname, dbzfield in dbz_dict.items():
+        # data noise filter
+        dbzfield = filterout_localnoise(data=dbzfield, threshold=threshold, delta=threshold)
+
+        # version1: Find the threshold so that the marking points are >100
+        '''
+        threshold = 50.0
+        # renew threshold and dot_num
+        while True:
+            x, y = [], []
+            for j in range(dbzfield.shape[0]):
+                for i in range(dbzfield.shape[1]):
+                    if dbzfield[j, i]<65.0 and dbzfield[j, i]>threshold:
+                        x.append(i)
+                        y.append(j)
+            dot_num = len(x)
+
+            if dot_num < 100:
+                threshold -= 1.0
+                print('----> threshold, dot_num:', threshold, dot_num)
+            else:
+                break
+        '''
+        # version2: threshold -> dbzfield>0
+        x, y = [], []
+        for j in range(dbzfield.shape[0]):
+            for i in range(dbzfield.shape[1]):
+                if dbzfield[j, i]<65.0 and dbzfield[j, i]>threshold:
+                    x.append(i)
+                    y.append(j)
+        dot_num = len(x)
+
+        print('---> threshold, dot_num, seed_num:', threshold, dot_num, seed_num)
+
+        # plot basic dbz image to overlay
+        title = 'dbz {} to overlay'.format(str(con))
+        savename = 'dbz{}'.format(str(con))
+        plot_basic_contourf('dbz', dbzfield, title, savepath, savename)
+        # call kmeans to plot
+        final_fig = kmeans(x, y, kx, ky, dot_num=dot_num, seed_num=seed_num, savepath=savepath, con=con, fig=0)
+
+        # overlay
+        dbz_layer = plt.imread(os.path.join(savepath, savename+'.png'))
+        k_layer = plt.imread(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(str(con), str(final_fig)) ))
+        plt.imshow(dbz_layer, alpha=0.5)
+        plt.imshow(k_layer, alpha=0.5)
+
+        plt.savefig(os.path.join(savepath, 'overlay_{}'.format(str(con))))
+        plt.close()
+
+        con += 1
+
+
+
+########################################################################
+
+
+# print pearson score (day 21)(10+2 vs 12 / 11+1 vs 12)
 def pearson():
     print('----> pearson gogo')
     # read grd
@@ -399,11 +543,258 @@ def pearson():
     print('pearson_rr_1h:', pearson_rr_1h)
     print('pearson_rr_2h:', pearson_rr_2h)
 
-# print moment score (10+2 vs 12 / 11+1 vs 12)
+# print moment score (day 21)(10+2 vs 12 / 11+1 vs 12)
 def moment():
     print('----> moment gogo')
-    print('等憶彤code弄好')
+    delta = 1.0
+    # read grd
+    dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
+    dbz_21_11_1h = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[6, 0, :, :]
+    dbz_21_10_2h = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[12, 0, :, :]
+    dbz_21_12_obs[dbz_21_12_obs<0.0] = 0
+    dbz_21_11_1h[dbz_21_11_1h<0.0] = 0
+    dbz_21_10_2h[dbz_21_10_2h<0.0] = 0
+    dbz_21_dict = {
+        'dbz_21_10_2h':dbz_21_10_2h,
+        'dbz_21_11_1h':dbz_21_11_1h,
+        'dbz_21_12_obs':dbz_21_12_obs,
+    }
+    dbz_23_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011231200.grd'))[0, 0, :, :]
+    dbz_23_11_1h = read_grd(os.path.join(grd_path, 'fstdbz_202011231100.grd'))[6, 0, :, :]
+    dbz_23_10_2h = read_grd(os.path.join(grd_path, 'fstdbz_202011231000.grd'))[12, 0, :, :]
+    dbz_23_12_obs[dbz_23_12_obs<0.0] = 0
+    dbz_23_11_1h[dbz_23_11_1h<0.0] = 0
+    dbz_23_10_2h[dbz_23_10_2h<0.0] = 0
+    dbz_23_dict = {
+        'dbz_23_10_2h':dbz_23_10_2h,
+        'dbz_23_11_1h':dbz_23_11_1h,
+        'dbz_23_12_obs':dbz_23_12_obs,
+    }
+    rr_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 1, :, :]
+    rr_21_11_1h = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[6, 1, :, :]
+    rr_21_10_2h = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[12, 1, :, :]
+    rr_21_12_obs[rr_21_12_obs<0.0] = 0
+    rr_21_11_1h[rr_21_11_1h<0.0] = 0
+    rr_21_10_2h[rr_21_10_2h<0.0] = 0
+    rr_21_dict = {
+        'rr_21_10_2h':rr_21_10_2h,
+        'rr_21_11_1h':rr_21_11_1h,
+        'rr_21_12_obs':rr_21_12_obs,
+    }
+    rr_23_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011231200.grd'))[0, 1, :, :]
+    rr_23_11_1h = read_grd(os.path.join(grd_path, 'fstdbz_202011231100.grd'))[6, 1, :, :]
+    rr_23_10_2h = read_grd(os.path.join(grd_path, 'fstdbz_202011231000.grd'))[12, 1, :, :]
+    rr_23_12_obs[rr_23_12_obs<0.0] = 0
+    rr_23_11_1h[rr_23_11_1h<0.0] = 0
+    rr_23_10_2h[rr_23_10_2h<0.0] = 0
+    rr_23_dict = {
+        'rr_23_10_2h':rr_23_10_2h,
+        'rr_23_11_1h':rr_23_11_1h,
+        'rr_23_12_obs':rr_23_12_obs,
+    }
 
+    dict_dict = {
+        'dbz_21':dbz_21_dict,
+        'dbz_23':dbz_23_dict,
+        'rr_21':rr_21_dict,
+        'rr_23':rr_23_dict,
+    }
+    for dict_name, dic in dict_dict.items():
+        v = [[] for x in range(7)]
+        for data_name, data in dic.items():
+            # mpq
+            m00=0
+            m10=0
+            m01=0
+            for j in range(y_num) :
+                for i in range(x_num) :
+                    m00 += data[j,i]*delta*delta
+                    m10 += i*data[j,i]*delta*delta
+                    m01 += j*data[j,i]*delta*delta
+            x_avg = m10/m00
+            y_avg = m01/m00
+
+            # cal u
+            u00=0
+            u20=0
+            u02=0
+            u30=0
+            u03=0
+            u12=0
+            u21=0
+            u11=0
+            for j in range(y_num):
+                for i in range(x_num):
+                    u00 += data[j,i]*delta*delta
+                    u20 += ((i-x_avg)**2)*data[j,i]*delta*delta
+                    u02 += ((j-y_avg)**2)*data[j,i]*delta*delta
+                    u30 += ((i-x_avg)**3)*data[j,i]*delta*delta
+                    u03 += ((j-y_avg)**3)*data[j,i]*delta*delta
+                    u12 += (i-x_avg)*((j-y_avg)**2)*data[j,i]*delta*delta
+                    u21 += ((i-x_avg)**2)*(j-y_avg)*data[j,i]*delta*delta
+                    u11 += (i-x_avg)*(j-y_avg)*data[j,i]*delta*delta
+            n20=u20/(u00**2)
+            n02=u02/(u00**2)
+            n11=u11/(u00**2)
+            n12=u12/(u00**2.5)
+            n21=u21/(u00**2.5)
+            n30=u30/(u00**2.5)
+            n03=u03/(u00**2.5)
+
+            theta1=n20+n02
+            theta2=(n20-n02)**2+4*(n11**2)
+            theta3=(n30-3*n12)**2+(3*n21-n03)**2
+            theta4=(n30+n12)**2+(n21+n03)**2
+            theta5=(n30-3*n12)*(n30+n12)*((n30+n12)**2-3*(n21+n03)**2)+(3*n21-n03)*(n21+n03)*(3*(n30+n12)**2-(n21+n03)**2)
+            theta6=(n20-n02)*((n30+n12)**2-(n12+n03)**2)+4*n11*(n30+n12)*(n21+n03)
+            theta7=(3*n21-n03)*(n30+n12)*((n30+n12)**2-3*(n21+n03)**2)-(n30-3*n12)*(n21+n03)*(3*(n30+n12)**2-(n21+n03)**2)
+
+            v[0].append(theta1)
+            v[1].append(theta2)
+            v[2].append(theta3)
+            v[3].append(theta4)
+            v[4].append(theta5)
+            v[5].append(theta6)
+            v[6].append(theta7)
+        v1_max=max(v[0])
+        v1_min=min(v[0])
+        v1_scale = v1_max-v1_min
+        v2_max=max(v[1])
+        v2_min=min(v[1])
+        v2_scale = v2_max-v2_min
+        v3_max=max(v[2])
+        v3_min=min(v[2])
+        v3_scale = v3_max-v3_min
+        v4_max=max(v[3])
+        v4_min=min(v[3])
+        v4_scale = v4_max-v4_min
+        v5_max=max(v[4])
+        v5_min=min(v[4])
+        v5_scale = v5_max-v5_min
+        v6_max=max(v[5])
+        v6_min=min(v[5])
+        v6_scale = v6_max-v6_min
+        v7_max=max(v[6])
+        v7_min=min(v[6])
+        v7_scale = v7_max-v7_min
+
+        # 10
+        v1_10=(v[0][0]-v1_min)/v1_scale
+        v2_10=(v[1][0]-v2_min)/v2_scale
+        v3_10=(v[2][0]-v3_min)/v3_scale
+        v4_10=(v[3][0]-v4_min)/v4_scale
+        v5_10=(v[4][0]-v5_min)/v5_scale
+        v6_10=(v[5][0]-v6_min)/v6_scale
+        v7_10=(v[6][0]-v7_min)/v7_scale
+        # 11
+        v1_11=(v[0][1]-v1_min)/v1_scale
+        v2_11=(v[1][1]-v2_min)/v2_scale
+        v3_11=(v[2][1]-v3_min)/v3_scale
+        v4_11=(v[3][1]-v4_min)/v4_scale
+        v5_11=(v[4][1]-v5_min)/v5_scale
+        v6_11=(v[5][1]-v6_min)/v6_scale
+        v7_11=(v[6][1]-v7_min)/v7_scale
+        # 12
+        v1_12=(v[0][2]-v1_min)/v1_scale
+        v2_12=(v[1][2]-v2_min)/v2_scale
+        v3_12=(v[2][2]-v3_min)/v3_scale
+        v4_12=(v[3][2]-v4_min)/v4_scale
+        v5_12=(v[4][2]-v5_min)/v5_scale
+        v6_12=(v[5][2]-v6_min)/v6_scale
+        v7_12=(v[6][2]-v7_min)/v7_scale
+
+        vd1=[abs(v1_10-v1_12),abs(v1_11-v1_12)]
+        vd2=[abs(v2_10-v2_12),abs(v2_11-v2_12)]
+        vd3=[abs(v3_10-v3_12),abs(v3_11-v3_12)]
+        vd4=[abs(v4_10-v4_12),abs(v4_11-v4_12)]
+        vd5=[abs(v5_10-v5_12),abs(v5_11-v5_12)]
+        vd6=[abs(v6_10-v6_12),abs(v6_11-v6_12)]
+        vd7=[abs(v7_10-v7_12),abs(v7_11-v7_12)]
+
+        #D(pi,p2)
+        d_2h=((v1_10-v1_12)**2+(v2_10-v2_12)**2+(v3_10-v3_12)**2+(v4_10-v4_12)**2+(v5_10-v5_12)**2+(v6_10-v6_12)**2+(v7_10-v7_12)**2)**0.5
+        d_1h=((v1_11-v1_12)**2+(v2_11-v2_12)**2+(v3_11-v3_12)**2+(v4_11-v4_12)**2+(v5_11-v5_12)**2+(v6_11-v6_12)**2+(v7_11-v7_12)**2)**0.5
+        d_max=((max(vd1))**2+(max(vd2))**2+(max(vd3))**2+(max(vd4))**2+(max(vd5))**2+(max(vd6))**2+(max(vd7))**2)**0.5
+
+        #DS=1-(D/D_max)
+        d_2hs=1-(d_2h/d_max)
+        d_1hs=1-(d_1h/d_max)
+
+        #AS
+        as_2h=1-math.acos((v1_10*v1_12+v2_10*v2_12+v3_10*v3_12+v4_10*v4_12+v5_10*v5_12+v6_10*v6_12+v7_10*v7_12)/((v1_10**2+v2_10**2+v3_10**2+v4_10**2+v5_10**2+v6_10**2+v7_10**2)**0.5*(v1_12**2+v2_12**2+v3_12**2+v4_12**2+v5_12**2+v6_12**2+v7_12**2)**0.5))/np.pi
+        as_1h=1-math.acos((v1_11*v1_12+v2_11*v2_12+v3_11*v3_12+v4_11*v4_12+v5_11*v5_12+v6_11*v6_12+v7_11*v7_12)/((v1_11**2+v2_11**2+v3_11**2+v4_11**2+v5_11**2+v6_11**2+v7_11**2)**0.5*(v1_12**2+v2_12**2+v3_12**2+v4_12**2+v5_12**2+v6_12**2+v7_12**2)**0.5))/np.pi
+        #S=(DS+AS)/2
+        s_2h=(d_2hs+as_2h)/2
+        s_1h=(d_1hs+as_1h)/2
+
+        print('----> ', dict_name)
+        print('s_1h, s_2h:', s_1h, s_2h)
+        print('v_10:', v1_10,v2_10,v3_10,v4_10,v5_10,v6_10,v7_10)
+        print('v_11:', v1_11,v2_11,v3_11,v4_11,v5_11,v6_11,v7_11)
+        print('v_12:', v1_12,v2_12,v3_12,v4_12,v5_12,v6_12,v7_12)
+        print('theta7:', v[6][0], v[6][1], v[6][2])
+
+
+
+# print dbz verification score and save img (day 21)(10+2 vs 12 / 11+1 vs 12)
+def score():
+    print('----> score gogo')
+    savepath = os.path.join('.', 'data_output_img', 'score')
+    # read grd
+    dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
+    dbz_21_11_1h = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[6, 0, :, :]
+    dbz_21_10_2h = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[12, 0, :, :]
+    dbz_23_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011231200.grd'))[0, 0, :, :]
+    dbz_23_11_1h = read_grd(os.path.join(grd_path, 'fstdbz_202011231100.grd'))[6, 0, :, :]
+    dbz_23_10_2h = read_grd(os.path.join(grd_path, 'fstdbz_202011231000.grd'))[12, 0, :, :]
+
+    threshold = 10.0
+    # !!! order is important !!! (< first, > after)
+    dbz_21_12_obs[dbz_21_12_obs <= threshold] = 2
+    dbz_21_12_obs[dbz_21_12_obs >  threshold] = 1
+    dbz_21_11_1h[dbz_21_11_1h <= threshold] = 0.5
+    dbz_21_11_1h[dbz_21_11_1h >  threshold] = 1
+    dbz_21_10_2h[dbz_21_10_2h <= threshold] = 0.5
+    dbz_21_10_2h[dbz_21_10_2h >  threshold] = 1
+    index_21_1h = dbz_21_12_obs-dbz_21_11_1h
+    index_21_2h = dbz_21_12_obs-dbz_21_10_2h
+
+    dbz_23_12_obs[dbz_23_12_obs <= threshold] = 2
+    dbz_23_12_obs[dbz_23_12_obs >  threshold] = 1
+    dbz_23_11_1h[dbz_23_11_1h <= threshold] = 0.5
+    dbz_23_11_1h[dbz_23_11_1h >  threshold] = 1
+    dbz_23_10_2h[dbz_23_10_2h <= threshold] = 0.5
+    dbz_23_10_2h[dbz_23_10_2h >  threshold] = 1
+    index_23_1h = dbz_23_12_obs-dbz_23_11_1h
+    index_23_2h = dbz_23_12_obs-dbz_23_10_2h
+
+    index_field_dict = {
+        'index_21_1h':index_21_1h,
+        'index_21_2h':index_21_2h,
+        'index_23_1h':index_23_1h,
+        'index_23_2h':index_23_2h,
+    }
+
+    for index_field_name, index_field in index_field_dict.items():
+        hit, falal, miss, non = 0, 0, 0, 0
+        for j in range(y_num) :
+            for i in range(x_num) :
+                if index_field[j, i] == 0:
+                    hit += 1
+                elif index_field[j, i] == 1:
+                    falal += 1
+                elif index_field[j, i] == 0.5:
+                    miss += 1
+                elif index_field[j, i] == 1.5:
+                    non += 1
+                else:
+                    print('count error!!!!!!!!!!')
+        print('{} hit: {}'.format(index_field_name, str(hit)))
+        print('{} falal: {}'.format(index_field_name, str(falal)))
+        print('{} miss: {}'.format(index_field_name, str(miss)))
+        print('{} non: {}'.format(index_field_name, str(non)))
+
+        plot_basic_contourf('index', index_field, index_field_name, savepath, index_field_name)
 
 
 if __name__ == '__main__':
@@ -414,12 +805,20 @@ if __name__ == '__main__':
     #compare_forecasts_effectiveness()
 
     #k_mean_convectivecell_marking()
+    #k_mean_convectivecell_marking_v2()
 
-    pearson()
+    #pearson()
     moment()
+    #score()
+
 
     # TODO
-    # 0.code整合上github
-    # 1.完善kmean的數個可改進方向()
+    # 0.code整合上github            ->(doing)
+    # 1.完善kmean的數個可改進方向(
+    #   用降水patern找固定kernel    ->
+    #   k-mean方法重構：第一次k-mean先做分群，沒用到的kernel就丟掉，用有標定的kernel做移動，同時記錄kernel們的移動，最後得到一串kernel們的移動方向
+    #   濾除不合理的局部雜訊        -> (done)
+    #   kernel移動追蹤法            ->
+    # )
     # 2.完成線性外延（期待有產出）
     # 3.深度學習資料確認與convLSTM模型初探
