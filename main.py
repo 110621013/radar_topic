@@ -600,7 +600,7 @@ def moment():
         'rr_23':rr_23_dict,
     }
     for dict_name, dic in dict_dict.items():
-        v = [[] for x in range(7)]
+        v = [[] for x in range(7)] # store theta(shape: 7*3)
         for data_name, data in dic.items():
             # mpq
             m00=0
@@ -729,9 +729,9 @@ def moment():
 
         print('----> ', dict_name)
         print('s_1h, s_2h:', s_1h, s_2h)
-        print('v_10:', v1_10,v2_10,v3_10,v4_10,v5_10,v6_10,v7_10)
-        print('v_11:', v1_11,v2_11,v3_11,v4_11,v5_11,v6_11,v7_11)
-        print('v_12:', v1_12,v2_12,v3_12,v4_12,v5_12,v6_12,v7_12)
+        #print('v_10:', v1_10,v2_10,v3_10,v4_10,v5_10,v6_10,v7_10)
+        #print('v_11:', v1_11,v2_11,v3_11,v4_11,v5_11,v6_11,v7_11)
+        #print('v_12:', v1_12,v2_12,v3_12,v4_12,v5_12,v6_12,v7_12)
         print('theta7:', v[6][0], v[6][1], v[6][2])
 
 
