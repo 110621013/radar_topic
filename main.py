@@ -21,6 +21,7 @@ grd_path = os.path.join('..')
 x_num, y_num, t_num, v_num = 921, 881, 19, 2
 lonlat_delta = 0.0125
 lon_upper, lon_lower, lat_upper, lat_lower = 126.5, 115, 29, 18
+fig = 0
 rr_colors = [
     "#fdfdfd", #white
     "#ccccb3", #grays
@@ -136,6 +137,7 @@ def check_output_folder():
         os.path.join('.', 'data_output_img', 'RMSE'),
         os.path.join('.', 'data_output_img', 'k_mean'),
         os.path.join('.', 'data_output_img', 'k_mean_v2'),
+        os.path.join('.', 'data_output_img', 'k_mean_v3'),
         os.path.join('.', 'data_output_img', 'score'),
     ]
     for folder in check_folder_list:
@@ -245,62 +247,64 @@ def plot_deltafield_RMSE(data, data_bar, time_interval_name):
 def dis(x, y, kx, ky):
     return int(((kx-x)**2 + (ky-y)**2)**0.5)
 # k-means grouping
-def kmeans(x, y, kx, ky, dot_num, seed_num, savepath, con, fig):
+def kmeans(element_list, kernel_list, savepath, savename):
+    global fig
+    kernel_num = len(kernel_list[0])
+    element_num = len(element_list[0])
     # grouping each element
     group = []
-    for i in range(seed_num):
+    for i in range(kernel_num):
         group.append([])
     min_dis = 99999999
-    for i in range(dot_num):
-        for j in range(seed_num):
-            distant = dis(x[i], y[i], kx[j], ky[j])
+    for i in range(element_num):
+        for j in range(kernel_num):
+            distant = dis(element_list[0][i], element_list[1][i], kernel_list[0][j], kernel_list[1][j])
             if distant < min_dis:
                 min_dis = distant
                 flag = j
-        group[flag].append([x[i], y[i]])
+        group[flag].append([element_list[0][i], element_list[1][i]])
         min_dis = 99999999
     # find the new grouping center for the grouped elements
     sumx, sumy = 0, 0
-    nkx, nky = [], []
+    new_kernel_list = [[], []]
     for index, nodes in enumerate(group):
         if nodes == []: # if no node in this group, pass away
-            nkx.append(kx[index])
-            nky.append(ky[index])
+            new_kernel_list[0].append(kernel_list[0][index])
+            new_kernel_list[1].append(kernel_list[1][index])
         else:
             for node in nodes:
                 sumx += node[0]
                 sumy += node[1]
-            nkx.append(int(sumx/len(nodes)))
-            nky.append(int(sumy/len(nodes)))
+            new_kernel_list[0].append(int(sumx/len(nodes)))
+            new_kernel_list[1].append(int(sumy/len(nodes)))
             sumx, sumy = 0, 0
 
     # plot kmean point
-    cx, cy = [], []
     line = plt.gca()
     line.set_xlim([0, x_num])
     line.set_ylim([0, y_num])
+
+    line_list = [[], []]
     for index, nodes in enumerate(group):
         for node in nodes:
-            cx.append([node[0], nkx[index]])
-            cy.append([node[1], nky[index]])
-        for i in range(len(cx)):
-            line.plot(cx[i], cy[i], color='r', alpha=0.5)
-        cx = []
-        cy = []
-    feature = plt.scatter(x, y, s=50)
+            line_list[0].append([node[0], new_kernel_list[0][index]])
+            line_list[1].append([node[1], new_kernel_list[1][index]])
+        for i in range(len(line_list[0])):
+            line.plot(line_list[0][i], line_list[1][i], color='r', alpha=0.3)
+        line_list = [[], []]
+    element = plt.scatter(element_list[0], element_list[1], s=30)
     #k_feature = plt.scatter(kx, ky, s=50)
-    cbar = plt.colorbar(feature) # <--just for alignment
-    nk_feaure = plt.scatter(np.array(nkx), np.array(nky), s=50)
-    plt.savefig(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(str(con), str(fig))))
+    plt.colorbar(element) # <--just for alignment
+    plt.scatter(np.array(new_kernel_list[0]), np.array(new_kernel_list[1]), s=30)
+    plt.savefig(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig))))
     plt.close()
 
     # determine whether the grouping center is no longer changed
-    if nkx == list(kx) and nky == list(ky):
-        return fig
+    if new_kernel_list[0] == list(kernel_list[0]) and new_kernel_list[1] == list(kernel_list[1]):
+        return
     else:
         fig += 1
-        fig = kmeans(x, y, nkx, nky, dot_num, seed_num, savepath, con, fig)
-    return fig
+        kmeans(element_list, new_kernel_list, savepath, savename)
 
 
 
@@ -335,12 +339,14 @@ def compare_forecasts_effectiveness():
     plot_deltafield_RMSE(dbz_21_11_1h, dbz_21_12_obs, '1hour')
     plot_deltafield_RMSE(dbz_21_10_2h, dbz_21_12_obs, '2hour')
 
-# do k-mean for all files and plot
-def k_mean_convectivecell_marking():
-    seed_num, con = 10, 0
+# do k-mean for all files and plot, version 1(random kernel, fixed threshold)
+def k_mean_convectivecell_marking_v1():
+    global fig
+    kernel_num = 10
     threshold = 40.0
     kernel_list = []
-    kx, ky = np.random.randint(0, x_num, seed_num), np.random.randint(0, y_num, seed_num)
+    kernel_list.append(list(np.random.randint(0, x_num, kernel_num)))
+    kernel_list.append(list(np.random.randint(0, y_num, kernel_num)))
     savepath = os.path.join('.', 'data_output_img', 'k_mean')
 
     # clean kmean old_file
@@ -359,60 +365,42 @@ def k_mean_convectivecell_marking():
     }
 
     for dbzname, dbzfield in dbz_dict.items():
-        # version1: Find the threshold so that the marking points are >100
-        '''
-        threshold = 50.0
-        # renew threshold and dot_num
-        while True:
-            x, y = [], []
-            for j in range(dbzfield.shape[0]):
-                for i in range(dbzfield.shape[1]):
-                    if dbzfield[j, i]<65.0 and dbzfield[j, i]>threshold:
-                        x.append(i)
-                        y.append(j)
-            dot_num = len(x)
+        # data noise filter
+        dbzfield = filterout_localnoise(data=dbzfield, threshold=threshold, delta=threshold)
 
-            if dot_num < 100:
-                threshold -= 1.0
-                print('----> threshold, dot_num:', threshold, dot_num)
-            else:
-                break
-        '''
-        # version2: threshold -> dbzfield>0
-        x, y = [], []
+        element_list = [[], []]
         for j in range(dbzfield.shape[0]):
             for i in range(dbzfield.shape[1]):
                 if dbzfield[j, i]<65.0 and dbzfield[j, i]>threshold:
-                    x.append(i)
-                    y.append(j)
-        dot_num = len(x)
-
-        print('---> threshold, dot_num, seed_num:', threshold, dot_num, seed_num)
+                    element_list[0].append(i)
+                    element_list[1].append(j)
+        print('---> threshold, element_num, kernel_num:', threshold, len(element_list[0]), kernel_num)
 
         # plot basic dbz image to overlay
-        title = 'dbz {} to overlay'.format(str(con))
-        savename = 'dbz{}'.format(str(con))
+        title = '{} to overlay'.format(dbzname)
+        savename = dbzname
         plot_basic_contourf('dbz', dbzfield, title, savepath, savename)
         # call kmeans to plot
-        final_fig = kmeans(x, y, kx, ky, dot_num=dot_num, seed_num=seed_num, savepath=savepath, con=con, fig=0)
+        kmeans(element_list, kernel_list, savepath=savepath, savename=savename)
 
         # overlay
         dbz_layer = plt.imread(os.path.join(savepath, savename+'.png'))
-        k_layer = plt.imread(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(str(con), str(final_fig)) ))
+        k_layer = plt.imread(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig)) ))
         plt.imshow(dbz_layer, alpha=0.5)
         plt.imshow(k_layer, alpha=0.5)
 
-        plt.savefig(os.path.join(savepath, 'overlay_{}'.format(str(con))))
+        plt.savefig(os.path.join(savepath, 'overlay_{}'.format(savename)))
         plt.close()
+        fig = 0
 
-        con += 1
-
-# do k-mean for all files and plot, version 2(add filter, clean folder)
+# do k-mean for all files and plot, version 2(data filter, random + pick only kernel, fixed threshold)
 def k_mean_convectivecell_marking_v2():
-    seed_num, con = 10, 0
+    global fig
+    kernel_num = 10
     threshold = 40.0
     kernel_list = []
-    kx, ky = np.random.randint(0, x_num, seed_num), np.random.randint(0, y_num, seed_num)
+    kernel_list.append(list(np.random.randint(0, x_num, kernel_num)))
+    kernel_list.append(list(np.random.randint(0, y_num, kernel_num)))
     savepath = os.path.join('.', 'data_output_img', 'k_mean_v2')
 
     # clean kmean old_file
@@ -434,58 +422,34 @@ def k_mean_convectivecell_marking_v2():
         # data noise filter
         dbzfield = filterout_localnoise(data=dbzfield, threshold=threshold, delta=threshold)
 
-        # version1: Find the threshold so that the marking points are >100
-        '''
-        threshold = 50.0
-        # renew threshold and dot_num
-        while True:
-            x, y = [], []
-            for j in range(dbzfield.shape[0]):
-                for i in range(dbzfield.shape[1]):
-                    if dbzfield[j, i]<65.0 and dbzfield[j, i]>threshold:
-                        x.append(i)
-                        y.append(j)
-            dot_num = len(x)
-
-            if dot_num < 100:
-                threshold -= 1.0
-                print('----> threshold, dot_num:', threshold, dot_num)
-            else:
-                break
-        '''
-        # version2: threshold -> dbzfield>0
-        x, y = [], []
+        element_list = [[], []]
         for j in range(dbzfield.shape[0]):
             for i in range(dbzfield.shape[1]):
                 if dbzfield[j, i]<65.0 and dbzfield[j, i]>threshold:
-                    x.append(i)
-                    y.append(j)
-        dot_num = len(x)
-
-        print('---> threshold, dot_num, seed_num:', threshold, dot_num, seed_num)
+                    element_list[0].append(i)
+                    element_list[1].append(j)
+        print('---> threshold, element_num, kernel_num:', threshold, len(element_list[0]), kernel_num)
 
         # plot basic dbz image to overlay
-        title = 'dbz {} to overlay'.format(str(con))
-        savename = 'dbz{}'.format(str(con))
+        title = '{} to overlay'.format(dbzname)
+        savename = dbzname
         plot_basic_contourf('dbz', dbzfield, title, savepath, savename)
         # call kmeans to plot
-        final_fig = kmeans(x, y, kx, ky, dot_num=dot_num, seed_num=seed_num, savepath=savepath, con=con, fig=0)
+        kmeans(element_list, kernel_list, savepath=savepath, savename=savename)
 
         # overlay
         dbz_layer = plt.imread(os.path.join(savepath, savename+'.png'))
-        k_layer = plt.imread(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(str(con), str(final_fig)) ))
+        k_layer = plt.imread(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig)) ))
         plt.imshow(dbz_layer, alpha=0.5)
         plt.imshow(k_layer, alpha=0.5)
 
-        plt.savefig(os.path.join(savepath, 'overlay_{}'.format(str(con))))
+        plt.savefig(os.path.join(savepath, 'overlay_{}'.format(savename)))
         plt.close()
-
-        con += 1
+        fig = 0
 
 
 
 ########################################################################
-
 
 # print pearson score (day 21)(10+2 vs 12 / 11+1 vs 12)
 def pearson():
@@ -804,21 +768,12 @@ if __name__ == '__main__':
     #create_NCDR_maple_img(delete_png_flag=False)
     #compare_forecasts_effectiveness()
 
-    #k_mean_convectivecell_marking()
-    #k_mean_convectivecell_marking_v2()
+    k_mean_convectivecell_marking_v1()
+    k_mean_convectivecell_marking_v2()
 
     #pearson()
-    moment()
+    #moment()
     #score()
 
-
     # TODO
-    # 0.code整合上github            ->(doing)
-    # 1.完善kmean的數個可改進方向(
-    #   用降水patern找固定kernel    ->
-    #   k-mean方法重構：第一次k-mean先做分群，沒用到的kernel就丟掉，用有標定的kernel做移動，同時記錄kernel們的移動，最後得到一串kernel們的移動方向
-    #   濾除不合理的局部雜訊        -> (done)
-    #   kernel移動追蹤法            ->
-    # )
-    # 2.完成線性外延（期待有產出）
-    # 3.深度學習資料確認與convLSTM模型初探
+    # 1.

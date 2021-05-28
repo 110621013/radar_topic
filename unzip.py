@@ -18,3 +18,7 @@ if __name__ == '__main__':
                 os.system('gzip -d {}'.format( os.path.join(root_mouth_day_path, gz) ))
 
     print('-------over------')
+
+
+
+os.system('ls')
