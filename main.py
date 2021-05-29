@@ -21,7 +21,10 @@ grd_path = os.path.join('..')
 x_num, y_num, t_num, v_num = 921, 881, 19, 2
 lonlat_delta = 0.0125
 lon_upper, lon_lower, lat_upper, lat_lower = 126.5, 115, 29, 18
-fig = 0
+# may changed global variable
+fig = 0                 # kmean times
+kernel_history = []     # record kernel_list for 10, 11, 12 dbz field(for nowcasting)
+
 rr_colors = [
     "#fdfdfd", #white
     "#ccccb3", #grays
@@ -135,9 +138,10 @@ def check_output_folder():
         os.path.join('.', 'data_output_img', 'dbz'),
         os.path.join('.', 'data_output_img', 'rr'),
         os.path.join('.', 'data_output_img', 'RMSE'),
-        os.path.join('.', 'data_output_img', 'k_mean'),
+        os.path.join('.', 'data_output_img', 'k_mean_v1'),
         os.path.join('.', 'data_output_img', 'k_mean_v2'),
         os.path.join('.', 'data_output_img', 'k_mean_v3'),
+        os.path.join('.', 'data_output_img', 'k_mean_v4'),
         os.path.join('.', 'data_output_img', 'score'),
     ]
     for folder in check_folder_list:
@@ -248,7 +252,7 @@ def dis(x, y, kx, ky):
     return int(((kx-x)**2 + (ky-y)**2)**0.5)
 # k-means grouping
 def kmeans(element_list, kernel_list, savepath, savename):
-    global fig
+    global fig, kernel_history
     kernel_num = len(kernel_list[0])
     element_num = len(element_list[0])
     # grouping each element
@@ -264,7 +268,7 @@ def kmeans(element_list, kernel_list, savepath, savename):
                 flag = j
         group[flag].append([element_list[0][i], element_list[1][i]])
         min_dis = 99999999
-    # find the new grouping center for the grouped elements
+    # find the new kernel for the grouped elements
     sumx, sumy = 0, 0
     new_kernel_list = [[], []]
     for index, nodes in enumerate(group):
@@ -301,6 +305,7 @@ def kmeans(element_list, kernel_list, savepath, savename):
 
     # determine whether the grouping center is no longer changed
     if new_kernel_list[0] == list(kernel_list[0]) and new_kernel_list[1] == list(kernel_list[1]):
+        kernel_history.append(kernel_list)
         return
     else:
         fig += 1
@@ -339,15 +344,16 @@ def compare_forecasts_effectiveness():
     plot_deltafield_RMSE(dbz_21_11_1h, dbz_21_12_obs, '1hour')
     plot_deltafield_RMSE(dbz_21_10_2h, dbz_21_12_obs, '2hour')
 
-# do k-mean for all files and plot, version 1(random kernel, fixed threshold)
+# do k-mean for all files and plot, version 1(data filter, random kernel, fixed threshold)
 def k_mean_convectivecell_marking_v1():
-    global fig
+    global fig, kernel_history
     kernel_num = 10
     threshold = 40.0
+    # init kernel_list
     kernel_list = []
     kernel_list.append(list(np.random.randint(0, x_num, kernel_num)))
     kernel_list.append(list(np.random.randint(0, y_num, kernel_num)))
-    savepath = os.path.join('.', 'data_output_img', 'k_mean')
+    savepath = os.path.join('.', 'data_output_img', 'k_mean_v1')
 
     # clean kmean old_file
     old_file_list = os.listdir(savepath)
@@ -355,13 +361,13 @@ def k_mean_convectivecell_marking_v1():
         os.remove(os.path.join(savepath, f))
 
     # read grd
+    dbz_21_10_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[0, 0, :, :]
+    dbz_21_11_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[0, 0, :, :]
     dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
-    dbz_21_11_1h = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[6, 0, :, :]
-    dbz_21_10_2h = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[12, 0, :, :]
     dbz_dict = {
+        'dbz_21_10_obs':dbz_21_10_obs,
+        'dbz_21_11_obs':dbz_21_11_obs,
         'dbz_21_12_obs':dbz_21_12_obs,
-        'dbz_21_11_1h':dbz_21_11_1h,
-        'dbz_21_10_2h':dbz_21_10_2h,
     }
 
     for dbzname, dbzfield in dbz_dict.items():
@@ -392,15 +398,31 @@ def k_mean_convectivecell_marking_v1():
         plt.savefig(os.path.join(savepath, 'overlay_{}'.format(savename)))
         plt.close()
         fig = 0
+    # nowcasting section
+    print('----> kernel_history:', kernel_history)
+    kernel_history = []
 
-# do k-mean for all files and plot, version 2(data filter, random + pick only kernel, fixed threshold)
+# do k-mean for all files and plot, version 2(data filter, normal kernel, fixed threshold)
 def k_mean_convectivecell_marking_v2():
-    global fig
+    global fig, kernel_history
     kernel_num = 10
     threshold = 40.0
+    # init kernel_list
     kernel_list = []
-    kernel_list.append(list(np.random.randint(0, x_num, kernel_num)))
-    kernel_list.append(list(np.random.randint(0, y_num, kernel_num)))
+    kernel_list.append(list(np.random.normal(int(x_num/2), scale=int(x_num/6), size=kernel_num)))
+    kernel_list.append(list(np.random.normal(int(y_num/2), scale=int(y_num/6), size=kernel_num)))
+    print('----> kernel_list:', kernel_list)
+    # check if out of kernel range
+    for i in range(len(kernel_list)):
+        for j in range(len(kernel_list[i])):
+            if i==0:
+                if kernel_list[i][j]>x_num or kernel_list[i][j]<0:
+                    kernel_list[i][j] = np.random.randint(0, x_num, 1)[0]
+                    print('----> x changed', i, j, kernel_list[i][j])
+            else:
+                if kernel_list[i][j]>y_num or kernel_list[i][j]<0:
+                    kernel_list[i][j] = np.random.randint(0, y_num, 1)[0]
+                    print('----> y changed', i, j, kernel_list[i][j])
     savepath = os.path.join('.', 'data_output_img', 'k_mean_v2')
 
     # clean kmean old_file
@@ -409,13 +431,13 @@ def k_mean_convectivecell_marking_v2():
         os.remove(os.path.join(savepath, f))
 
     # read grd
+    dbz_21_10_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[0, 0, :, :]
+    dbz_21_11_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[0, 0, :, :]
     dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
-    dbz_21_11_1h = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[6, 0, :, :]
-    dbz_21_10_2h = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[12, 0, :, :]
     dbz_dict = {
+        'dbz_21_10_obs':dbz_21_10_obs,
+        'dbz_21_11_obs':dbz_21_11_obs,
         'dbz_21_12_obs':dbz_21_12_obs,
-        'dbz_21_11_1h':dbz_21_11_1h,
-        'dbz_21_10_2h':dbz_21_10_2h,
     }
 
     for dbzname, dbzfield in dbz_dict.items():
@@ -446,7 +468,158 @@ def k_mean_convectivecell_marking_v2():
         plt.savefig(os.path.join(savepath, 'overlay_{}'.format(savename)))
         plt.close()
         fig = 0
+    # nowcasting section
+    print('----> kernel_history:', kernel_history)
+    kernel_history = []
 
+# return picked_kermel_list
+def get_picked_kermel(element_list, kernel_list):
+    kernel_num = len(kernel_list[0])
+    element_num = len(element_list[0])
+    # grouping each element
+    group = []
+    for i in range(kernel_num):
+        group.append([])
+    min_dis = 99999999
+    for i in range(element_num):
+        for j in range(kernel_num):
+            distant = dis(element_list[0][i], element_list[1][i], kernel_list[0][j], kernel_list[1][j])
+            if distant < min_dis:
+                min_dis = distant
+                flag = j
+        group[flag].append([element_list[0][i], element_list[1][i]])
+        min_dis = 99999999
+    # find the new kernel for the grouped elements
+    sumx, sumy = 0, 0
+    new_kernel_list = [[], []]
+    for index, nodes in enumerate(group):
+        if nodes != []:
+            for node in nodes:
+                sumx += node[0]
+                sumy += node[1]
+            new_kernel_list[0].append(int(sumx/len(nodes)))
+            new_kernel_list[1].append(int(sumy/len(nodes)))
+            sumx, sumy = 0, 0
+    return new_kernel_list
+# do k-mean for all files and plot, version 3(data filter, random + pick only kernel, fixed threshold)
+def k_mean_convectivecell_marking_v3():
+    global fig, kernel_history
+    kernel_num = 10
+    threshold = 40.0
+    # init kernel_list
+    kernel_list = []
+    kernel_list.append(list(np.random.randint(0, x_num, kernel_num)))
+    kernel_list.append(list(np.random.randint(0, y_num, kernel_num)))
+    print('----> kernel_list', kernel_list)
+    savepath = os.path.join('.', 'data_output_img', 'k_mean_v3')
+
+    # clean kmean old_file
+    old_file_list = os.listdir(savepath)
+    for f in old_file_list:
+        os.remove(os.path.join(savepath, f))
+
+    # read grd
+    dbz_21_10_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[0, 0, :, :]
+    dbz_21_11_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[0, 0, :, :]
+    dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
+    dbz_dict = {
+        'dbz_21_10_obs':dbz_21_10_obs,
+        'dbz_21_11_obs':dbz_21_11_obs,
+        'dbz_21_12_obs':dbz_21_12_obs,
+    }
+
+    for dbzname, dbzfield in dbz_dict.items():
+        # data noise filter
+        dbzfield = filterout_localnoise(data=dbzfield, threshold=threshold, delta=threshold)
+
+        element_list = [[], []]
+        for j in range(dbzfield.shape[0]):
+            for i in range(dbzfield.shape[1]):
+                if dbzfield[j, i]<65.0 and dbzfield[j, i]>threshold:
+                    element_list[0].append(i)
+                    element_list[1].append(j)
+        print('---> threshold, element_num, kernel_num:', threshold, len(element_list[0]), kernel_num)
+
+        # plot basic dbz image to overlay
+        title = '{} to overlay'.format(dbzname)
+        savename = dbzname
+        plot_basic_contourf('dbz', dbzfield, title, savepath, savename)
+        # call get_picked_kermel
+        picked_kernel_list = get_picked_kermel(element_list, kernel_list)
+        print('----> picked_kernel_list', picked_kernel_list)
+        # call kmeans to plot
+        kmeans(element_list, picked_kernel_list, savepath=savepath, savename=savename)
+
+        # overlay
+        dbz_layer = plt.imread(os.path.join(savepath, savename+'.png'))
+        k_layer = plt.imread(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig)) ))
+        plt.imshow(dbz_layer, alpha=0.5)
+        plt.imshow(k_layer, alpha=0.5)
+
+        plt.savefig(os.path.join(savepath, 'overlay_{}'.format(savename)))
+        plt.close()
+        fig = 0
+    # nowcasting section
+    print('----> kernel_history:', kernel_history)
+    kernel_history = []
+
+# do k-mean for all files and plot, version 4(data filter, fixed kernel, fixed threshold)
+def k_mean_convectivecell_marking_v4():
+    global fig, kernel_history
+    kernel_num = 10
+    threshold = 40.0
+    # init kernel_list
+    kernel_list = []
+    kernel_list.append(list(np.random.randint(0, x_num, kernel_num)))
+    kernel_list.append(list(np.random.randint(0, y_num, kernel_num)))
+    savepath = os.path.join('.', 'data_output_img', 'k_mean_v4')
+
+    # clean kmean old_file
+    old_file_list = os.listdir(savepath)
+    for f in old_file_list:
+        os.remove(os.path.join(savepath, f))
+
+    # read grd
+    dbz_21_10_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[0, 0, :, :]
+    dbz_21_11_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[0, 0, :, :]
+    dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
+    dbz_dict = {
+        'dbz_21_10_obs':dbz_21_10_obs,
+        'dbz_21_11_obs':dbz_21_11_obs,
+        'dbz_21_12_obs':dbz_21_12_obs,
+    }
+
+    for dbzname, dbzfield in dbz_dict.items():
+        # data noise filter
+        dbzfield = filterout_localnoise(data=dbzfield, threshold=threshold, delta=threshold)
+
+        element_list = [[], []]
+        for j in range(dbzfield.shape[0]):
+            for i in range(dbzfield.shape[1]):
+                if dbzfield[j, i]<65.0 and dbzfield[j, i]>threshold:
+                    element_list[0].append(i)
+                    element_list[1].append(j)
+        print('---> threshold, element_num, kernel_num:', threshold, len(element_list[0]), kernel_num)
+
+        # plot basic dbz image to overlay
+        title = '{} to overlay'.format(dbzname)
+        savename = dbzname
+        plot_basic_contourf('dbz', dbzfield, title, savepath, savename)
+        # call kmeans to plot
+        kmeans(element_list, kernel_list, savepath=savepath, savename=savename)
+
+        # overlay
+        dbz_layer = plt.imread(os.path.join(savepath, savename+'.png'))
+        k_layer = plt.imread(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig)) ))
+        plt.imshow(dbz_layer, alpha=0.5)
+        plt.imshow(k_layer, alpha=0.5)
+
+        plt.savefig(os.path.join(savepath, 'overlay_{}'.format(savename)))
+        plt.close()
+        fig = 0
+    # nowcasting section
+    print('----> kernel_history:', kernel_history)
+    kernel_history = []
 
 
 ########################################################################
@@ -770,10 +943,14 @@ if __name__ == '__main__':
 
     k_mean_convectivecell_marking_v1()
     k_mean_convectivecell_marking_v2()
+    k_mean_convectivecell_marking_v3()
+    #k_mean_convectivecell_marking_v4()
 
     #pearson()
     #moment()
     #score()
 
-    # TODO
-    # 1.
+
+    #TODO (done)
+    #k-mean資料改用觀測場
+    #要有個全域變數kernel_history(dict/list)紀錄每個dbz_field最終的kernel_list (for nowcasting)

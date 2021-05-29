@@ -6,13 +6,12 @@ arr[arr<5] = -1.0
 print(arr)
 '''
 
-'''
 x_num, y_num, t_num, v_num = 921, 881, 19, 2
 
-out = np.random.normal(int(x_num/2), scale=int(x_num/2), size=10)
+out = np.random.normal(int(x_num/2), scale=int(x_num/6), size=10)
 print(out)
-'''
 
+'''
 fig = 0
 print('1:', fig)
 
@@ -32,3 +31,4 @@ if __name__ == '__main__':
     print('5:', fig)
     f1()
     print('6:', fig)
+'''
