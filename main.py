@@ -93,6 +93,7 @@ def read_grd(filename):
     data = np.fromfile(filename, dtype="<f4")
     data = data.reshape((t_num, v_num, y_num, x_num), order='C')
     return data
+
 # arg: data nparray(y, x) + check threshold + noise delta, return fixed data nparray(y, x)
 def filterout_localnoise(data, threshold, delta):
     for j in range(data.shape[0]):
@@ -130,7 +131,6 @@ def filterout_localnoise(data, threshold, delta):
                     data[j, i] /= con
     return data
 
-
 # check all folder we need
 def check_output_folder():
     check_folder_list = [
@@ -142,6 +142,11 @@ def check_output_folder():
         os.path.join('.', 'data_output_img', 'k_mean_v2'),
         os.path.join('.', 'data_output_img', 'k_mean_v3'),
         os.path.join('.', 'data_output_img', 'k_mean_v4'),
+        os.path.join('.', 'data_output_img', 'k_mean_adjust_threshold'),
+        os.path.join('.', 'data_output_img', 'k_mean_limit_group_radiu'),
+        os.path.join('.', 'data_output_img', 'k_mean_limit_kernel_radiu'),
+        os.path.join('.', 'data_output_img', 'k_mean_limit_group_kernel_radiu'),
+        os.path.join('.', 'data_output_img', 'k_mean_final'),
         os.path.join('.', 'data_output_img', 'score'),
     ]
     for folder in check_folder_list:
@@ -296,9 +301,9 @@ def kmeans(element_list, kernel_list, savepath, savename):
         for i in range(len(line_list[0])):
             line.plot(line_list[0][i], line_list[1][i], color='r', alpha=0.3)
         line_list = [[], []]
-    element = plt.scatter(element_list[0], element_list[1], s=30)
+    element_scatter = plt.scatter(element_list[0], element_list[1], s=30)
     #k_feature = plt.scatter(kx, ky, s=50)
-    plt.colorbar(element) # <--just for alignment
+    plt.colorbar(element_scatter) # <--just for alignment
     plt.scatter(np.array(new_kernel_list[0]), np.array(new_kernel_list[1]), s=30)
     plt.savefig(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig))))
     plt.close()
@@ -310,7 +315,67 @@ def kmeans(element_list, kernel_list, savepath, savename):
     else:
         fig += 1
         kmeans(element_list, new_kernel_list, savepath, savename)
+# k-means grouping with limit_group_radiu (if element in this group but distantce > limit_group_radiu, Don't consider it)
+def kmeans_limit_group_radiu(element_list, kernel_list, limit_group_radiu, savepath, savename):
+    global fig, kernel_history
+    kernel_num = len(kernel_list[0])
+    element_num = len(element_list[0])
+    # grouping each element
+    group = []
+    for i in range(kernel_num):
+        group.append([])
+    min_dis = 99999999
+    for i in range(element_num):
+        for j in range(kernel_num):
+            distant = dis(element_list[0][i], element_list[1][i], kernel_list[0][j], kernel_list[1][j])
+            if distant < min_dis:
+                min_dis = distant
+                flag = j
+        if distant < limit_group_radiu: #####
+            group[flag].append([element_list[0][i], element_list[1][i]])
+        min_dis = 99999999
+    # find the new kernel for the grouped elements
+    sumx, sumy = 0, 0
+    new_kernel_list = [[], []]
+    for index, nodes in enumerate(group):
+        if nodes == []: # if no node in this group, pass away
+            new_kernel_list[0].append(kernel_list[0][index])
+            new_kernel_list[1].append(kernel_list[1][index])
+        else:
+            for node in nodes:
+                sumx += node[0]
+                sumy += node[1]
+            new_kernel_list[0].append(int(sumx/len(nodes)))
+            new_kernel_list[1].append(int(sumy/len(nodes)))
+            sumx, sumy = 0, 0
 
+    # plot kmean point
+    line = plt.gca()
+    line.set_xlim([0, x_num])
+    line.set_ylim([0, y_num])
+
+    line_list = [[], []]
+    for index, nodes in enumerate(group):
+        for node in nodes:
+            line_list[0].append([node[0], new_kernel_list[0][index]])
+            line_list[1].append([node[1], new_kernel_list[1][index]])
+        for i in range(len(line_list[0])):
+            line.plot(line_list[0][i], line_list[1][i], color='r', alpha=0.3)
+        line_list = [[], []]
+    element_scatter = plt.scatter(element_list[0], element_list[1], s=30)
+    #k_feature = plt.scatter(kx, ky, s=50)
+    plt.colorbar(element_scatter) # <--just for alignment
+    plt.scatter(np.array(new_kernel_list[0]), np.array(new_kernel_list[1]), s=30)
+    plt.savefig(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig))))
+    plt.close()
+
+    # determine whether the grouping center is no longer changed
+    if new_kernel_list[0] == list(kernel_list[0]) and new_kernel_list[1] == list(kernel_list[1]):
+        kernel_history.append(kernel_list)
+        return
+    else:
+        fig += 1
+        kmeans(element_list, new_kernel_list, savepath, savename)
 
 
 # plot and save all img from grd_path
@@ -344,6 +409,9 @@ def compare_forecasts_effectiveness():
     plot_deltafield_RMSE(dbz_21_11_1h, dbz_21_12_obs, '1hour')
     plot_deltafield_RMSE(dbz_21_10_2h, dbz_21_12_obs, '2hour')
 
+########################################################################
+
+# 以下k_mean_convectivecell_marking_v{} 系列都在測試不同的kernel擺放方式
 # do k-mean for all files and plot, version 1(data filter, random kernel, fixed threshold)
 def k_mean_convectivecell_marking_v1():
     global fig, kernel_history
@@ -399,7 +467,8 @@ def k_mean_convectivecell_marking_v1():
         plt.close()
         fig = 0
     # nowcasting section
-    print('----> kernel_history:', kernel_history)
+    nowcasting_savename = 'dbz_21_11_obs_kmean_1h_v1'
+    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
     kernel_history = []
 
 # do k-mean for all files and plot, version 2(data filter, normal kernel, fixed threshold)
@@ -409,7 +478,7 @@ def k_mean_convectivecell_marking_v2():
     threshold = 40.0
     # init kernel_list
     kernel_list = []
-    kernel_list.append(list(np.random.normal(int(x_num/2), scale=int(x_num/6), size=kernel_num)))
+    kernel_list.append(list(np.random.normal(int(x_num/2), scale=int(x_num/6), size=kernel_num))) # 3 standard(99.7%)
     kernel_list.append(list(np.random.normal(int(y_num/2), scale=int(y_num/6), size=kernel_num)))
     print('----> kernel_list:', kernel_list)
     # check if out of kernel range
@@ -469,7 +538,8 @@ def k_mean_convectivecell_marking_v2():
         plt.close()
         fig = 0
     # nowcasting section
-    print('----> kernel_history:', kernel_history)
+    nowcasting_savename = 'dbz_21_11_obs_kmean_1h_v2'
+    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
     kernel_history = []
 
 # return picked_kermel_list
@@ -560,7 +630,8 @@ def k_mean_convectivecell_marking_v3():
         plt.close()
         fig = 0
     # nowcasting section
-    print('----> kernel_history:', kernel_history)
+    nowcasting_savename = 'dbz_21_11_obs_kmean_1h_v3'
+    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
     kernel_history = []
 
 # do k-mean for all files and plot, version 4(data filter, fixed kernel, fixed threshold)
@@ -570,8 +641,14 @@ def k_mean_convectivecell_marking_v4():
     threshold = 40.0
     # init kernel_list
     kernel_list = []
-    kernel_list.append(list(np.random.randint(0, x_num, kernel_num)))
-    kernel_list.append(list(np.random.randint(0, y_num, kernel_num)))
+    #[400, 560] 台灣海峽(120, 25)
+    #[520, 640] 北部外海(121.5, 26)
+    #[600, 520] 宜蘭外海(122.5, 24.5)
+    #[560, 360] 台東外海(122, 22.5)
+    #[440, 240] 巴士海峽(120.5, 21)
+    #[320, 400] 高屏外海(119, 23)
+    kernel_list.append([400, 520, 600, 560, 440, 320])
+    kernel_list.append([560, 640, 520, 360, 240, 400])
     savepath = os.path.join('.', 'data_output_img', 'k_mean_v4')
 
     # clean kmean old_file
@@ -618,8 +695,429 @@ def k_mean_convectivecell_marking_v4():
         plt.close()
         fig = 0
     # nowcasting section
-    print('----> kernel_history:', kernel_history)
+    nowcasting_savename = 'dbz_21_11_obs_kmean_1h_v4'
+    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
     kernel_history = []
+
+######################################################################
+## 6/9 todo section
+
+# do k-mean for all files and plot, version 3 + addition/subtraction threshold (data filter, random + pick only kernel)
+def k_mean_convectivecell_marking_v3_adjust_threshold():
+    print()
+    print('----> k_mean_convectivecell_marking_v3_adjust_threshold <----')
+    global fig, kernel_history
+    kernel_num = 10
+    threshold_list = [25.0, 30.0, 35.0, 40.0, 45.0, 50.0]
+    # init kernel_list
+    kernel_list = []
+    kernel_list.append(list(np.random.randint(0, x_num, kernel_num)))
+    kernel_list.append(list(np.random.randint(0, y_num, kernel_num)))
+    print('----> kernel_list', kernel_list)
+    savepath = os.path.join('.', 'data_output_img', 'k_mean_adjust_threshold')
+
+    # clean kmean old_file
+    old_file_list = os.listdir(savepath)
+    for f in old_file_list:
+        os.remove(os.path.join(savepath, f))
+
+    # read grd
+    dbz_21_10_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[0, 0, :, :]
+    dbz_21_11_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[0, 0, :, :]
+    dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
+    dbz_dict = {
+        'dbz_21_10_obs':dbz_21_10_obs,
+        'dbz_21_11_obs':dbz_21_11_obs,
+        'dbz_21_12_obs':dbz_21_12_obs,
+    }
+
+    for dbzname, dbzfield in dbz_dict.items():
+        for threshold in threshold_list:
+            # data noise filter
+            dbzfield = filterout_localnoise(data=dbzfield, threshold=threshold, delta=threshold)
+            # plot basic dbz image to overlay
+            title = '{} to overlay'.format(dbzname)
+            savename = dbzname+'__threshold'+str(int(threshold))
+            plot_basic_contourf('dbz', dbzfield, title, savepath=savepath, savename=dbzname)
+
+            element_list = [[], []]
+            for j in range(dbzfield.shape[0]):
+                for i in range(dbzfield.shape[1]):
+                    if dbzfield[j, i]<65.0 and dbzfield[j, i]>threshold:
+                        element_list[0].append(i)
+                        element_list[1].append(j)
+            print('---> threshold, element_num, kernel_num:', threshold, len(element_list[0]), kernel_num)
+
+            # call get_picked_kermel
+            picked_kernel_list = get_picked_kermel(element_list, kernel_list)
+            print('----> picked_kernel_list', picked_kernel_list)
+            # call kmeans to plot
+            kmeans(element_list, picked_kernel_list, savepath=savepath, savename=savename)
+
+            # overlay
+            dbz_layer = plt.imread(os.path.join(savepath, dbzname+'.png'))
+            k_layer = plt.imread(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig)) ))
+            plt.imshow(dbz_layer, alpha=0.5)
+            plt.imshow(k_layer, alpha=0.5)
+
+            plt.savefig(os.path.join(savepath, 'overlay_{}'.format(savename)))
+            plt.close()
+            fig = 0
+        kernel_history = []
+
+# do k-mean for all files and plot, version 3 + limit_group_radiu_kmean (data filter, random + pick only kernel, fixed threshold)
+def k_mean_convectivecell_marking_v3_limit_group_radiu():
+    print()
+    print('----> k_mean_convectivecell_marking_v3_limit_group_radiu <----')
+    global fig, kernel_history
+    limit_group_radiu = 40 # 80 grid points, equal to 1 lon/lat
+    kernel_num = 10
+    threshold = 40.0
+    # init kernel_list
+    kernel_list = []
+    kernel_list.append(list(np.random.randint(0, x_num, kernel_num)))
+    kernel_list.append(list(np.random.randint(0, y_num, kernel_num)))
+    print('----> kernel_list', kernel_list)
+    savepath = os.path.join('.', 'data_output_img', 'k_mean_limit_group_radiu')
+
+    # clean kmean old_file
+    old_file_list = os.listdir(savepath)
+    for f in old_file_list:
+        os.remove(os.path.join(savepath, f))
+
+    # read grd
+    dbz_21_10_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[0, 0, :, :]
+    dbz_21_11_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[0, 0, :, :]
+    dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
+    dbz_dict = {
+        'dbz_21_10_obs':dbz_21_10_obs,
+        'dbz_21_11_obs':dbz_21_11_obs,
+        'dbz_21_12_obs':dbz_21_12_obs,
+    }
+
+    for dbzname, dbzfield in dbz_dict.items():
+        # data noise filter
+        dbzfield = filterout_localnoise(data=dbzfield, threshold=threshold, delta=threshold)
+
+        element_list = [[], []]
+        for j in range(dbzfield.shape[0]):
+            for i in range(dbzfield.shape[1]):
+                if dbzfield[j, i]<65.0 and dbzfield[j, i]>threshold:
+                    element_list[0].append(i)
+                    element_list[1].append(j)
+        print('---> threshold, element_num, kernel_num:', threshold, len(element_list[0]), kernel_num)
+
+        # plot basic dbz image to overlay
+        title = '{} to overlay'.format(dbzname)
+        savename = dbzname+'__limit_group_radiu'+str(limit_group_radiu)
+        plot_basic_contourf('dbz', dbzfield, title, savepath, savename)
+        # call get_picked_kermel
+        picked_kernel_list = get_picked_kermel(element_list, kernel_list)
+        print('----> picked_kernel_list', picked_kernel_list)
+        # call kmeans to plot
+        kmeans_limit_group_radiu(element_list, picked_kernel_list, limit_group_radiu, savepath=savepath, savename=savename)
+
+        # overlay
+        dbz_layer = plt.imread(os.path.join(savepath, savename+'.png'))
+        k_layer = plt.imread(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig)) ))
+        plt.imshow(dbz_layer, alpha=0.5)
+        plt.imshow(k_layer, alpha=0.5)
+
+        plt.savefig(os.path.join(savepath, 'overlay_{}'.format(savename)))
+        plt.close()
+        fig = 0
+    # nowcasting section
+    nowcasting_savename = 'dbz_21_11_obs_kmean_1h_group_ridiu'
+    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
+    kernel_history = []
+
+# do k-mean for all files and plot, version 3 + kernel_distance_limit (data filter, random + pick only kernel, fixed threshold)
+def k_mean_convectivecell_marking_v3_limit_kernel_radiu():
+    print()
+    print('----> k_mean_convectivecell_marking_v3_limit_kernel_radiu <----')
+    global fig, kernel_history
+    limit_kernel_radiu = 20 # 80 grid points, equal to 1 lon/lat
+    kernel_num = 10
+    threshold = 40.0
+    #################################
+    while True:
+        kernel_list_not_ok_flag = False
+        # init kernel_list
+        kernel_list = []
+        kernel_list.append(list(np.random.randint(0, x_num, kernel_num)))
+        kernel_list.append(list(np.random.randint(0, y_num, kernel_num)))
+        for i in range(kernel_num):
+            for j in range(i+1, kernel_num):
+                distance = dis(kernel_list[0][i], kernel_list[1][i], kernel_list[0][j], kernel_list[1][j])
+                if distance < limit_kernel_radiu:
+                    kernel_list_not_ok_flag = True
+        if not kernel_list_not_ok_flag:
+            break
+    #################################
+    print('----> kernel_list', kernel_list)
+    savepath = os.path.join('.', 'data_output_img', 'k_mean_limit_kernel_radiu')
+
+    # clean kmean old_file
+    old_file_list = os.listdir(savepath)
+    for f in old_file_list:
+        os.remove(os.path.join(savepath, f))
+
+    # read grd
+    dbz_21_10_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[0, 0, :, :]
+    dbz_21_11_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[0, 0, :, :]
+    dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
+    dbz_dict = {
+        'dbz_21_10_obs':dbz_21_10_obs,
+        'dbz_21_11_obs':dbz_21_11_obs,
+        'dbz_21_12_obs':dbz_21_12_obs,
+    }
+
+    for dbzname, dbzfield in dbz_dict.items():
+        # data noise filter
+        dbzfield = filterout_localnoise(data=dbzfield, threshold=threshold, delta=threshold)
+
+        element_list = [[], []]
+        for j in range(dbzfield.shape[0]):
+            for i in range(dbzfield.shape[1]):
+                if dbzfield[j, i]<65.0 and dbzfield[j, i]>threshold:
+                    element_list[0].append(i)
+                    element_list[1].append(j)
+        print('---> threshold, element_num, kernel_num:', threshold, len(element_list[0]), kernel_num)
+
+        # plot basic dbz image to overlay
+        title = '{} to overlay'.format(dbzname)
+        savename = dbzname+'__limit_kernel_radiu'+str(limit_kernel_radiu)
+        plot_basic_contourf('dbz', dbzfield, title, savepath, savename)
+        # call get_picked_kermel
+        picked_kernel_list = get_picked_kermel(element_list, kernel_list)
+        print('----> picked_kernel_list', picked_kernel_list)
+        # call kmeans to plot
+        kmeans(element_list, picked_kernel_list, savepath=savepath, savename=savename)
+
+        # overlay
+        dbz_layer = plt.imread(os.path.join(savepath, savename+'.png'))
+        k_layer = plt.imread(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig)) ))
+        plt.imshow(dbz_layer, alpha=0.5)
+        plt.imshow(k_layer, alpha=0.5)
+
+        plt.savefig(os.path.join(savepath, 'overlay_{}'.format(savename)))
+        plt.close()
+        fig = 0
+    # nowcasting section
+    nowcasting_savename = 'dbz_21_11_obs_kmean_1h_kernel_ridiu'
+    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
+    kernel_history = []
+
+# do k-mean for all files and plot, version 3 + limit_group_radiu_kmean + kernel_distance_limit (data filter, random + pick only kernel, fixed threshold)
+def k_mean_convectivecell_marking_v3_limit_group_kernel_radiu():
+    print()
+    print('----> k_mean_convectivecell_marking_v3_limit_group_kernel_radiu <----')
+    global fig, kernel_history
+    limit_group_radiu = 40
+    limit_kernel_radiu = 20 # 80 grid points, equal to 1 lon/lat
+    kernel_num = 10
+    threshold = 40.0
+    # init kernel_list
+    while True:
+        kernel_list_not_ok_flag = False
+        # init kernel_list
+        kernel_list = []
+        kernel_list.append(list(np.random.randint(0, x_num, kernel_num)))
+        kernel_list.append(list(np.random.randint(0, y_num, kernel_num)))
+        for i in range(kernel_num):
+            for j in range(i+1, kernel_num):
+                distance = dis(kernel_list[0][i], kernel_list[1][i], kernel_list[0][j], kernel_list[1][j])
+                if distance < limit_kernel_radiu:
+                    kernel_list_not_ok_flag = True
+        if not kernel_list_not_ok_flag:
+            break
+    print('----> kernel_list', kernel_list)
+    savepath = os.path.join('.', 'data_output_img', 'k_mean_limit_group_kernel_radiu')
+
+    # clean kmean old_file
+    old_file_list = os.listdir(savepath)
+    for f in old_file_list:
+        os.remove(os.path.join(savepath, f))
+
+    # read grd
+    dbz_21_10_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[0, 0, :, :]
+    dbz_21_11_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[0, 0, :, :]
+    dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
+    dbz_dict = {
+        'dbz_21_10_obs':dbz_21_10_obs,
+        'dbz_21_11_obs':dbz_21_11_obs,
+        'dbz_21_12_obs':dbz_21_12_obs,
+    }
+
+    for dbzname, dbzfield in dbz_dict.items():
+        # data noise filter
+        dbzfield = filterout_localnoise(data=dbzfield, threshold=threshold, delta=threshold)
+
+        element_list = [[], []]
+        for j in range(dbzfield.shape[0]):
+            for i in range(dbzfield.shape[1]):
+                if dbzfield[j, i]<65.0 and dbzfield[j, i]>threshold:
+                    element_list[0].append(i)
+                    element_list[1].append(j)
+        print('---> threshold, element_num, kernel_num:', threshold, len(element_list[0]), kernel_num)
+
+        # plot basic dbz image to overlay
+        title = '{} to overlay'.format(dbzname)
+        savename = dbzname+'__limit_group_kernel_radiu'+str(limit_group_radiu)
+        plot_basic_contourf('dbz', dbzfield, title, savepath, savename)
+        # call get_picked_kermel
+        picked_kernel_list = get_picked_kermel(element_list, kernel_list)
+        print('----> picked_kernel_list', picked_kernel_list)
+        # call kmeans to plot
+        kmeans_limit_group_radiu(element_list, picked_kernel_list, limit_group_radiu, savepath=savepath, savename=savename)
+
+        # overlay
+        dbz_layer = plt.imread(os.path.join(savepath, savename+'.png'))
+        k_layer = plt.imread(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig)) ))
+        plt.imshow(dbz_layer, alpha=0.5)
+        plt.imshow(k_layer, alpha=0.5)
+
+        plt.savefig(os.path.join(savepath, 'overlay_{}'.format(savename)))
+        plt.close()
+        fig = 0
+    # nowcasting section
+    nowcasting_savename = 'dbz_21_11_obs_kmean_1h_group_kernel_ridiu'
+    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
+    kernel_history = []
+
+
+# do k-mean for all field and plot, version 3 + limit_group_radiu_kmean + kernel_distance_limit (data filter, random + pick only kernel, fixed threshold = 30)
+def k_mean_convectivecell_marking_final():
+    print()
+    print('----> k_mean_convectivecell_marking_final <----')
+    global fig, kernel_history
+    limit_group_radiu = 40
+    limit_kernel_radiu = 20 # 80 grid points, equal to 1 lon/lat
+    kernel_num = 10
+    threshold = 30.0
+    # create kernel_list
+    while True:
+        kernel_list_not_ok_flag = False
+        # init kernel_list
+        kernel_list = []
+        kernel_list.append(list(np.random.randint(0, x_num, kernel_num)))
+        kernel_list.append(list(np.random.randint(0, y_num, kernel_num)))
+        for i in range(kernel_num):
+            for j in range(i+1, kernel_num):
+                distance = dis(kernel_list[0][i], kernel_list[1][i], kernel_list[0][j], kernel_list[1][j])
+                if distance < limit_kernel_radiu:
+                    kernel_list_not_ok_flag = True
+        if not kernel_list_not_ok_flag:
+            break
+    print('----> kernel_list', kernel_list)
+    savepath = os.path.join('.', 'data_output_img', 'k_mean_final')
+
+    # clean kmean old_file
+    old_file_list = os.listdir(savepath)
+    for f in old_file_list:
+        os.remove(os.path.join(savepath, f))
+
+    # read grd
+    dbz_21_10_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[0, 0, :, :]
+    dbz_21_11_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[0, 0, :, :]
+    dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
+    dbz_dict = {
+        'dbz_21_10_obs':dbz_21_10_obs,
+        'dbz_21_11_obs':dbz_21_11_obs,
+        'dbz_21_12_obs':dbz_21_12_obs,
+    }
+
+    for dbzname, dbzfield in dbz_dict.items():
+        # data noise filter
+        dbzfield = filterout_localnoise(data=dbzfield, threshold=threshold, delta=threshold)
+
+        element_list = [[], []]
+        for j in range(dbzfield.shape[0]):
+            for i in range(dbzfield.shape[1]):
+                if dbzfield[j, i]<65.0 and dbzfield[j, i]>threshold:
+                    element_list[0].append(i)
+                    element_list[1].append(j)
+        print('---> threshold, element_num, kernel_num:', threshold, len(element_list[0]), kernel_num)
+
+        # plot basic dbz image to overlay
+        title = '{} to overlay'.format(dbzname)
+        savename = dbzname+'__final'
+        plot_basic_contourf('dbz', dbzfield, title, savepath, savename)
+        # call get_picked_kermel
+        picked_kernel_list = get_picked_kermel(element_list, kernel_list)
+        print('----> picked_kernel_list', picked_kernel_list)
+        # call kmeans to plot
+        kmeans_limit_group_radiu(element_list, picked_kernel_list, limit_group_radiu, savepath=savepath, savename=savename)
+
+        # overlay
+        dbz_layer = plt.imread(os.path.join(savepath, savename+'.png'))
+        k_layer = plt.imread(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig)) ))
+        plt.imshow(dbz_layer, alpha=0.5)
+        plt.imshow(k_layer, alpha=0.5)
+
+        plt.savefig(os.path.join(savepath, 'overlay_{}'.format(savename)))
+        plt.close()
+        fig = 0
+    # nowcasting section
+    nowcasting_savename = 'dbz_21_11_obs_kmean_1h_final'
+    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
+    kernel_history = []
+
+# use dbz_21_11_obs(suppose 11 is now, we know 10) and kernel_history(The movement trajectory of the obs kernel) for linear nowcasting
+# suppose we know 10, 11 but don’t know 12, we predict 12 by 11 and kernel movement of 10->11,
+# create dbz_21_11_obs_kmean_1h, save img
+def kmean_nowcasting(dbz_21_11_obs, savepath, savename):
+    global kernel_history
+
+    # get kernel move
+    kernel_list_10, kernel_list_11 = kernel_history[0], kernel_history[1]
+    num_kernel = len(kernel_list_11[0])
+    print('====> kernel_list_11:', kernel_list_11)
+    print('====> kernel_list_10:', kernel_list_10)
+    x_move, y_move = [], []
+    for i in range(num_kernel):
+        x_move.append(round(kernel_list_11[0][i] - kernel_list_10[0][i]))
+        y_move.append(round(kernel_list_11[1][i] - kernel_list_10[1][i]))
+    print('====> x_move:', x_move)
+    print('====> y_move:', y_move)
+
+    dbz_21_11_obs_kmean_1h = np.full_like(dbz_21_11_obs, -1.0)
+
+    for j in range(y_num):
+        for i in range(x_num):
+            if dbz_21_11_obs[j, i] > 0.0:
+                # group
+                min_distance = 99999999
+                flag = -1
+                for n in range(num_kernel):
+                    distance = dis(i, j, kernel_list_11[0][n], kernel_list_11[1][n])
+                    #print('n, distance, min_distance', n, distance, min_distance)
+                    if distance < min_distance:
+                        min_distance = distance
+                        flag = n
+                #print('flag', flag)
+                # move, kernel往哪就往哪印在dbz_21_11_obs_kmean_1h
+                new_x = i + x_move[flag]
+                new_y = j + y_move[flag]
+                if new_x < 0: #超過範圍就算了
+                    #print('new_x < 0')
+                    pass
+                elif new_x >= x_num:
+                    #print('new_x > x_num')
+                    pass
+                elif new_y < 0:
+                    #print('new_y < 0')
+                    pass
+                elif new_y >= y_num:
+                    #print('new_y > y_num')
+                    pass
+                else:
+                    #print('====> ok case, i, j, dbz_21_11_obs[j, i], new_x, new_y:', i, j, dbz_21_11_obs[j, i], new_x, new_y)
+                    #print('====> dbz_21_11_obs_kmean_1h.shape, dbz_21_11_obs.shape:', dbz_21_11_obs_kmean_1h.shape, dbz_21_11_obs.shape)
+                    if dbz_21_11_obs_kmean_1h[new_y, new_x] < dbz_21_11_obs[j, i]: #重疊就取大者
+                        dbz_21_11_obs_kmean_1h[new_y, new_x] = dbz_21_11_obs[j, i]
+    # plot and save
+    plot_basic_contourf('dbz', dbz_21_11_obs_kmean_1h, title=savename, savepath=savepath, savename=savename)
 
 
 ########################################################################
@@ -944,13 +1442,14 @@ if __name__ == '__main__':
     k_mean_convectivecell_marking_v1()
     k_mean_convectivecell_marking_v2()
     k_mean_convectivecell_marking_v3()
-    #k_mean_convectivecell_marking_v4()
+    k_mean_convectivecell_marking_v4()
+
+    #k_mean_convectivecell_marking_v3_adjust_threshold()
+    k_mean_convectivecell_marking_v3_limit_group_radiu()
+    k_mean_convectivecell_marking_v3_limit_kernel_radiu()
+    k_mean_convectivecell_marking_v3_limit_group_kernel_radiu()
+    k_mean_convectivecell_marking_final()
 
     #pearson()
     #moment()
     #score()
-
-
-    #TODO (done)
-    #k-mean資料改用觀測場
-    #要有個全域變數kernel_history(dict/list)紀錄每個dbz_field最終的kernel_list (for nowcasting)
