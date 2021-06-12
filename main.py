@@ -148,6 +148,7 @@ def check_output_folder():
         os.path.join('.', 'data_output_img', 'k_mean_limit_group_kernel_radiu'),
         os.path.join('.', 'data_output_img', 'k_mean_final'),
         os.path.join('.', 'data_output_img', 'score'),
+        os.path.join('.', 'data_output_img', 'ensemble'),
     ]
     for folder in check_folder_list:
         if os.path.exists(folder) == False:
@@ -350,6 +351,7 @@ def kmeans_limit_group_radiu(element_list, kernel_list, limit_group_radiu, savep
             sumx, sumy = 0, 0
 
     # plot kmean point
+    #no IO
     line = plt.gca()
     line.set_xlim([0, x_num])
     line.set_ylim([0, y_num])
@@ -376,6 +378,7 @@ def kmeans_limit_group_radiu(element_list, kernel_list, limit_group_radiu, savep
     else:
         fig += 1
         kmeans(element_list, new_kernel_list, savepath, savename)
+        kmeans_limit_group_radiu(element_list, new_kernel_list, limit_group_radiu, savepath, savename)
 
 
 # plot and save all img from grd_path
@@ -468,8 +471,9 @@ def k_mean_convectivecell_marking_v1():
         fig = 0
     # nowcasting section
     nowcasting_savename = 'dbz_21_11_obs_kmean_1h_v1'
-    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
+    dbz_21_11_obs_kmean_1h = kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
     kernel_history = []
+    return dbz_21_11_obs_kmean_1h
 
 # do k-mean for all files and plot, version 2(data filter, normal kernel, fixed threshold)
 def k_mean_convectivecell_marking_v2():
@@ -539,8 +543,9 @@ def k_mean_convectivecell_marking_v2():
         fig = 0
     # nowcasting section
     nowcasting_savename = 'dbz_21_11_obs_kmean_1h_v2'
-    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
+    dbz_21_11_obs_kmean_1h = kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
     kernel_history = []
+    return dbz_21_11_obs_kmean_1h
 
 # return picked_kermel_list
 def get_picked_kermel(element_list, kernel_list):
@@ -631,8 +636,9 @@ def k_mean_convectivecell_marking_v3():
         fig = 0
     # nowcasting section
     nowcasting_savename = 'dbz_21_11_obs_kmean_1h_v3'
-    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
+    dbz_21_11_obs_kmean_1h = kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
     kernel_history = []
+    return dbz_21_11_obs_kmean_1h
 
 # do k-mean for all files and plot, version 4(data filter, fixed kernel, fixed threshold)
 def k_mean_convectivecell_marking_v4():
@@ -696,8 +702,9 @@ def k_mean_convectivecell_marking_v4():
         fig = 0
     # nowcasting section
     nowcasting_savename = 'dbz_21_11_obs_kmean_1h_v4'
-    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
+    dbz_21_11_obs_kmean_1h = kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
     kernel_history = []
+    return dbz_21_11_obs_kmean_1h
 
 ######################################################################
 ## 6/9 todo section
@@ -770,7 +777,7 @@ def k_mean_convectivecell_marking_v3_limit_group_radiu():
     print()
     print('----> k_mean_convectivecell_marking_v3_limit_group_radiu <----')
     global fig, kernel_history
-    limit_group_radiu = 40 # 80 grid points, equal to 1 lon/lat
+    limit_group_radiu = 80 # 80 grid points, equal to 1 lon/lat
     kernel_num = 10
     threshold = 40.0
     # init kernel_list
@@ -828,8 +835,9 @@ def k_mean_convectivecell_marking_v3_limit_group_radiu():
         fig = 0
     # nowcasting section
     nowcasting_savename = 'dbz_21_11_obs_kmean_1h_group_ridiu'
-    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
+    dbz_21_11_obs_kmean_1h = kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
     kernel_history = []
+    return dbz_21_11_obs_kmean_1h
 
 # do k-mean for all files and plot, version 3 + kernel_distance_limit (data filter, random + pick only kernel, fixed threshold)
 def k_mean_convectivecell_marking_v3_limit_kernel_radiu():
@@ -905,15 +913,16 @@ def k_mean_convectivecell_marking_v3_limit_kernel_radiu():
         fig = 0
     # nowcasting section
     nowcasting_savename = 'dbz_21_11_obs_kmean_1h_kernel_ridiu'
-    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
+    dbz_21_11_obs_kmean_1h = kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
     kernel_history = []
+    return dbz_21_11_obs_kmean_1h
 
 # do k-mean for all files and plot, version 3 + limit_group_radiu_kmean + kernel_distance_limit (data filter, random + pick only kernel, fixed threshold)
 def k_mean_convectivecell_marking_v3_limit_group_kernel_radiu():
     print()
     print('----> k_mean_convectivecell_marking_v3_limit_group_kernel_radiu <----')
     global fig, kernel_history
-    limit_group_radiu = 40
+    limit_group_radiu = 80
     limit_kernel_radiu = 20 # 80 grid points, equal to 1 lon/lat
     kernel_num = 10
     threshold = 40.0
@@ -982,16 +991,17 @@ def k_mean_convectivecell_marking_v3_limit_group_kernel_radiu():
         fig = 0
     # nowcasting section
     nowcasting_savename = 'dbz_21_11_obs_kmean_1h_group_kernel_ridiu'
-    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
+    dbz_21_11_obs_kmean_1h = kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
     kernel_history = []
+    return dbz_21_11_obs_kmean_1h
 
 
 # do k-mean for all field and plot, version 3 + limit_group_radiu_kmean + kernel_distance_limit (data filter, random + pick only kernel, fixed threshold = 30)
 def k_mean_convectivecell_marking_final():
-    print()
-    print('----> k_mean_convectivecell_marking_final <----')
+    print()#no IO
+    print('----> k_mean_convectivecell_marking_final <----')#no IO
     global fig, kernel_history
-    limit_group_radiu = 40
+    limit_group_radiu = 80
     limit_kernel_radiu = 20 # 80 grid points, equal to 1 lon/lat
     kernel_num = 10
     threshold = 30.0
@@ -1009,13 +1019,15 @@ def k_mean_convectivecell_marking_final():
                     kernel_list_not_ok_flag = True
         if not kernel_list_not_ok_flag:
             break
-    print('----> kernel_list', kernel_list)
+    print('----> kernel_list', kernel_list)#no IO
     savepath = os.path.join('.', 'data_output_img', 'k_mean_final')
 
     # clean kmean old_file
+    #no IO
     old_file_list = os.listdir(savepath)
     for f in old_file_list:
         os.remove(os.path.join(savepath, f))
+
 
     # read grd
     dbz_21_10_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[0, 0, :, :]
@@ -1040,16 +1052,17 @@ def k_mean_convectivecell_marking_final():
         print('---> threshold, element_num, kernel_num:', threshold, len(element_list[0]), kernel_num)
 
         # plot basic dbz image to overlay
-        title = '{} to overlay'.format(dbzname)
+        title = '{} to overlay'.format(dbzname)#no IO
         savename = dbzname+'__final'
-        plot_basic_contourf('dbz', dbzfield, title, savepath, savename)
+        plot_basic_contourf('dbz', dbzfield, title, savepath, savename)#no IO
         # call get_picked_kermel
         picked_kernel_list = get_picked_kermel(element_list, kernel_list)
-        print('----> picked_kernel_list', picked_kernel_list)
+        print('----> picked_kernel_list', picked_kernel_list)#no IO
         # call kmeans to plot
         kmeans_limit_group_radiu(element_list, picked_kernel_list, limit_group_radiu, savepath=savepath, savename=savename)
 
         # overlay
+        #no IO
         dbz_layer = plt.imread(os.path.join(savepath, savename+'.png'))
         k_layer = plt.imread(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig)) ))
         plt.imshow(dbz_layer, alpha=0.5)
@@ -1057,11 +1070,13 @@ def k_mean_convectivecell_marking_final():
 
         plt.savefig(os.path.join(savepath, 'overlay_{}'.format(savename)))
         plt.close()
+
         fig = 0
     # nowcasting section
     nowcasting_savename = 'dbz_21_11_obs_kmean_1h_final'
-    kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
+    dbz_21_11_obs_kmean_1h = kmean_nowcasting(dbz_dict['dbz_21_11_obs'], savepath, nowcasting_savename)
     kernel_history = []
+    return dbz_21_11_obs_kmean_1h
 
 # use dbz_21_11_obs(suppose 11 is now, we know 10) and kernel_history(The movement trajectory of the obs kernel) for linear nowcasting
 # suppose we know 10, 11 but don’t know 12, we predict 12 by 11 and kernel movement of 10->11,
@@ -1072,14 +1087,14 @@ def kmean_nowcasting(dbz_21_11_obs, savepath, savename):
     # get kernel move
     kernel_list_10, kernel_list_11 = kernel_history[0], kernel_history[1]
     num_kernel = len(kernel_list_11[0])
-    print('====> kernel_list_11:', kernel_list_11)
-    print('====> kernel_list_10:', kernel_list_10)
+    print('====> kernel_list_11:', kernel_list_11) #no IO
+    print('====> kernel_list_10:', kernel_list_10) #no IO
     x_move, y_move = [], []
     for i in range(num_kernel):
         x_move.append(round(kernel_list_11[0][i] - kernel_list_10[0][i]))
         y_move.append(round(kernel_list_11[1][i] - kernel_list_10[1][i]))
-    print('====> x_move:', x_move)
-    print('====> y_move:', y_move)
+    print('====> x_move:', x_move) #no IO
+    print('====> y_move:', y_move) #no IO
 
     dbz_21_11_obs_kmean_1h = np.full_like(dbz_21_11_obs, -1.0)
 
@@ -1117,7 +1132,8 @@ def kmean_nowcasting(dbz_21_11_obs, savepath, savename):
                     if dbz_21_11_obs_kmean_1h[new_y, new_x] < dbz_21_11_obs[j, i]: #重疊就取大者
                         dbz_21_11_obs_kmean_1h[new_y, new_x] = dbz_21_11_obs[j, i]
     # plot and save
-    plot_basic_contourf('dbz', dbz_21_11_obs_kmean_1h, title=savename, savepath=savepath, savename=savename)
+    plot_basic_contourf('dbz', dbz_21_11_obs_kmean_1h, title=savename, savepath=savepath, savename=savename) #no IO
+    return dbz_21_11_obs_kmean_1h
 
 
 ########################################################################
@@ -1369,10 +1385,8 @@ def moment():
         #print('v_12:', v1_12,v2_12,v3_12,v4_12,v5_12,v6_12,v7_12)
         print('theta7:', v[6][0], v[6][1], v[6][2])
 
-
-
 # print dbz verification score and save img (day 21)(10+2 vs 12 / 11+1 vs 12)
-def score():
+def score_fixed_data():
     print('----> score gogo')
     savepath = os.path.join('.', 'data_output_img', 'score')
     # read grd
@@ -1431,6 +1445,51 @@ def score():
 
         plot_basic_contourf('index', index_field, index_field_name, savepath, index_field_name)
 
+# giving 2 field, compare and calculate EST score
+def est_score(nowcasting_field, observation_field):
+    threshold = 30.0
+    nowcasting_field[nowcasting_field <= threshold] = 2.0
+    nowcasting_field[nowcasting_field > threshold] = 1.0
+    observation_field[observation_field <= threshold] = 0.5
+    observation_field[observation_field > threshold] = 1.0
+
+    hits, fales_alarm, misses, correct_negatives = 0, 0, 0, 0
+    delta_field = nowcasting_field - observation_field
+    for j in range(y_num):
+        for i in range(x_num):
+            if delta_field[j, i] == 0:
+                hits += 1
+            elif delta_field[j, i] == 1:
+                fales_alarm += 1
+            elif delta_field[j, i] == 0.5:
+                misses += 1
+            elif delta_field[j, i] == 1.5:
+                correct_negatives += 1
+            else:
+                print('???', delta_field[j, i])
+    abc = hits + fales_alarm + misses
+    n = abc + correct_negatives
+    TS = hits/abc
+    ar = (hits+fales_alarm)*(hits+misses)/n**2
+    ETS = ((hits-ar)/(abc-ar))
+    return ETS
+
+# use final_version K-mean to nowcasting, if EST > MAPLE then include to model
+def final_version_ensemble(epochs):
+    savepath = os.path.join('.', 'data_output_img', 'ensemble'),
+
+    dbz_21_11_obs_MAPLE_1h = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[6, 0, :, :]
+    dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
+    MAPLE_EST = est_score(dbz_21_11_obs_MAPLE_1h, dbz_21_12_obs)
+    print('====> MAPLE_EST:', MAPLE_EST)
+
+    for i in range(epochs):
+        dbz_21_11_obs_kmean_1h = k_mean_convectivecell_marking_final()
+        kmean_EST = est_score(dbz_21_11_obs_kmean_1h, dbz_21_12_obs)
+        plot_basic_contourf('dbz', dbz_21_11_obs_kmean_1h, 'dbz_21_11_obs_kmean_1h_{}'.format(str(i)), savepath, 'dbz_21_11_obs_kmean_1h_{}'.format(str(i)))
+        print('====> kmean_EST:', kmean_EST)
+
+    #TODO: save img if kmean_EST > MAPLE_EST
 
 if __name__ == '__main__':
     # data_source : ..
@@ -1450,6 +1509,8 @@ if __name__ == '__main__':
     k_mean_convectivecell_marking_v3_limit_group_kernel_radiu()
     k_mean_convectivecell_marking_final()
 
+    #final_version_ensemble(epochs=20)
+
     #pearson()
     #moment()
-    #score()
+    #score_fixed_data()

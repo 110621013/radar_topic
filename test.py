@@ -5,12 +5,12 @@ print(arr.shape)
 arr[arr<5] = -1.0
 print(arr)
 '''
-
+'''
 x_num, y_num, t_num, v_num = 921, 881, 19, 2
 
 out = np.random.normal(int(x_num/2), scale=int(x_num/6), size=10)
 print(out)
-
+'''
 '''
 fig = 0
 print('1:', fig)
@@ -32,3 +32,14 @@ if __name__ == '__main__':
     f1()
     print('6:', fig)
 '''
+
+d = {
+    1:1,
+    2:2,
+    5:'x',
+}
+print(d[5])
+
+d = {'1.5':60000, '2.5':60000, '3.5':60000, '4.5':60000}
+hits = d['1.5']
+print(hits + 30)
