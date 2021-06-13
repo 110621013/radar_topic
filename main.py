@@ -1485,7 +1485,7 @@ def TS_ETS_score(nowcasting_field_input, observation_field_input):
     return TS, ETS
 
 # use final_version K-mean to nowcasting, if EST > MAPLE then include to model
-def final_version_ensemble(cases):
+def final_version_ensemble(cases, better_than):
     savepath = os.path.join('.', 'data_output_img', 'ensemble')
 
     dbz_21_11_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[0, 0, :, :]
@@ -1503,9 +1503,17 @@ def final_version_ensemble(cases):
         kmean_TS, kmean_ETS = TS_ETS_score(dbz_21_11_obs_kmean_1h, dbz_21_12_obs)
         print('====> kmean_TS, kmean_ETS:', kmean_TS, kmean_ETS)
 
-        #if kmean_ETS > persistent_ETS and kmean_ETS > MAPLE_ETS:
-        if kmean_ETS > MAPLE_ETS:
-            savename = 'dbz_21_11_obs_kmean_1h_{}'.format(str(num_of_good_cases))
+        if better_than == 'persistent' and kmean_ETS > persistent_ETS: #'persistent'/'MPALE'/'both'
+            kmaen_result_save_flag = True
+        elif better_than == 'MPALE' and kmean_ETS > MAPLE_ETS:
+            kmaen_result_save_flag = True
+        elif better_than == 'both' and kmean_ETS > MAPLE_ETS and kmean_ETS > persistent_ETS:
+            kmaen_result_save_flag = True
+        else:
+            print('what you mean?? ¯\_(ツ)_/¯')
+
+        if kmaen_result_save_flag:
+            savename = 'dbz_21_11_obs_kmean_1h_case{}'.format(str(num_of_good_cases))
             title='ETS\nkmean:{:.3f} persistent:{:.3f} MAPLE:{:.3f}'.format(kmean_ETS, persistent_ETS, MAPLE_ETS)
             print('==)', savepath, savename, title)
 
@@ -1537,7 +1545,7 @@ if __name__ == '__main__':
     #k_mean_convectivecell_marking_v3_limit_group_kernel_radiu() # kmeans_limit_group_radiu problem, don't use
     #k_mean_convectivecell_marking_final()
 
-    final_version_ensemble(cases=20)
+    final_version_ensemble(cases=20, better_than='MPALE') # better_than -> 'persistent'/'MPALE'/'both'
 
     #pearson()
     #moment()
