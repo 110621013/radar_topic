@@ -1487,6 +1487,7 @@ def TS_ETS_score(nowcasting_field_input, observation_field_input):
 # use final_version K-mean to nowcasting, if EST > MAPLE then include to model
 def final_version_ensemble(cases, better_than):
     savepath = os.path.join('.', 'data_output_img', 'ensemble')
+    test_counter = 0
 
     dbz_21_11_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[0, 0, :, :]
     dbz_21_11_obs_MAPLE_1h = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[6, 0, :, :]
@@ -1503,6 +1504,7 @@ def final_version_ensemble(cases, better_than):
         kmean_TS, kmean_ETS = TS_ETS_score(dbz_21_11_obs_kmean_1h, dbz_21_12_obs)
         print('====> kmean_TS, kmean_ETS:', kmean_TS, kmean_ETS)
 
+        kmaen_result_save_flag = False
         if better_than == 'persistent' and kmean_ETS > persistent_ETS: #'persistent'/'MPALE'/'both'
             kmaen_result_save_flag = True
         elif better_than == 'MPALE' and kmean_ETS > MAPLE_ETS:
@@ -1515,7 +1517,6 @@ def final_version_ensemble(cases, better_than):
         if kmaen_result_save_flag:
             savename = 'dbz_21_11_obs_kmean_1h_case{}'.format(str(num_of_good_cases))
             title='ETS\nkmean:{:.3f} persistent:{:.3f} MAPLE:{:.3f}'.format(kmean_ETS, persistent_ETS, MAPLE_ETS)
-            print('==)', savepath, savename, title)
 
             plot_basic_contourf(
                 dataname='dbz',
@@ -1525,6 +1526,10 @@ def final_version_ensemble(cases, better_than):
                 savename=savename,
             )
             num_of_good_cases += 1
+        test_counter += 1
+    print()
+    print('K-mean nowcasting method requires better than {} method'.format(better_than))
+    print('Test {}, success {}, success rate {:.3f}'.format(test_counter, num_of_good_cases, test_counter/num_of_good_cases))
 
 
 if __name__ == '__main__':
@@ -1545,7 +1550,7 @@ if __name__ == '__main__':
     #k_mean_convectivecell_marking_v3_limit_group_kernel_radiu() # kmeans_limit_group_radiu problem, don't use
     #k_mean_convectivecell_marking_final()
 
-    final_version_ensemble(cases=20, better_than='MPALE') # better_than -> 'persistent'/'MPALE'/'both'
+    final_version_ensemble(cases=5, better_than='MPALE') # better_than -> 'persistent'/'MPALE'/'both'
 
     #pearson()
     #moment()
