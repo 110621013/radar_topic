@@ -212,10 +212,6 @@ def plot_basic_contourf(dataname, datafield, title, savepath, savename):
         cbar.set_label(dataname, rotation=0, labelpad=-25, y=1.05)
         cbar.set_ticks(levels)
 
-    # special case
-    #if dataname == 'index':
-    #    cbar.set_ticks(['hits', 'misses', 'false alarm', 'correct negatives'])
-
     plt.savefig(os.path.join(savepath, savename))
     plt.close()
 
@@ -289,7 +285,8 @@ def kmeans(element_list, kernel_list, savepath, savename):
             new_kernel_list[1].append(int(sumy/len(nodes)))
             sumx, sumy = 0, 0
 
-    # plot kmean point
+    # plot kmean point #no IO
+    '''
     line = plt.gca()
     line.set_xlim([0, x_num])
     line.set_ylim([0, y_num])
@@ -308,6 +305,7 @@ def kmeans(element_list, kernel_list, savepath, savename):
     plt.scatter(np.array(new_kernel_list[0]), np.array(new_kernel_list[1]), s=30)
     plt.savefig(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig))))
     plt.close()
+    '''
 
     # determine whether the grouping center is no longer changed
     if new_kernel_list[0] == list(kernel_list[0]) and new_kernel_list[1] == list(kernel_list[1]):
@@ -317,6 +315,7 @@ def kmeans(element_list, kernel_list, savepath, savename):
         fig += 1
         kmeans(element_list, new_kernel_list, savepath, savename)
 # k-means grouping with limit_group_radiu (if element in this group but distantce > limit_group_radiu, Don't consider it)
+# !!! some ERROR, don't use !!!
 def kmeans_limit_group_radiu(element_list, kernel_list, limit_group_radiu, savepath, savename):
     global fig, kernel_history
     kernel_num = len(kernel_list[0])
@@ -332,7 +331,7 @@ def kmeans_limit_group_radiu(element_list, kernel_list, limit_group_radiu, savep
             if distant < min_dis:
                 min_dis = distant
                 flag = j
-        if distant < limit_group_radiu: #####
+        if min_dis < limit_group_radiu: #####
             group[flag].append([element_list[0][i], element_list[1][i]])
         min_dis = 99999999
     # find the new kernel for the grouped elements
@@ -350,33 +349,34 @@ def kmeans_limit_group_radiu(element_list, kernel_list, limit_group_radiu, savep
             new_kernel_list[1].append(int(sumy/len(nodes)))
             sumx, sumy = 0, 0
 
-    # plot kmean point
-    #no IO
-    line = plt.gca()
-    line.set_xlim([0, x_num])
-    line.set_ylim([0, y_num])
-
-    line_list = [[], []]
-    for index, nodes in enumerate(group):
-        for node in nodes:
-            line_list[0].append([node[0], new_kernel_list[0][index]])
-            line_list[1].append([node[1], new_kernel_list[1][index]])
-        for i in range(len(line_list[0])):
-            line.plot(line_list[0][i], line_list[1][i], color='r', alpha=0.3)
-        line_list = [[], []]
-    element_scatter = plt.scatter(element_list[0], element_list[1], s=30)
-    #k_feature = plt.scatter(kx, ky, s=50)
-    plt.colorbar(element_scatter) # <--just for alignment
-    plt.scatter(np.array(new_kernel_list[0]), np.array(new_kernel_list[1]), s=30)
-    plt.savefig(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig))))
-    plt.close()
-
     # determine whether the grouping center is no longer changed
-    if new_kernel_list[0] == list(kernel_list[0]) and new_kernel_list[1] == list(kernel_list[1]):
+    if new_kernel_list[0] == list(kernel_list[0]) and new_kernel_list[1] == list(kernel_list[1]) or fig>50:
         kernel_history.append(kernel_list)
+
+        # plot kmean point
+        line = plt.gca()
+        line.set_xlim([0, x_num])
+        line.set_ylim([0, y_num])
+
+        line_list = [[], []]
+        for index, nodes in enumerate(group):
+            for node in nodes:
+                line_list[0].append([node[0], new_kernel_list[0][index]])
+                line_list[1].append([node[1], new_kernel_list[1][index]])
+            for i in range(len(line_list[0])):
+                line.plot(line_list[0][i], line_list[1][i], color='r', alpha=0.3)
+            line_list = [[], []]
+        element_scatter = plt.scatter(element_list[0], element_list[1], s=30)
+        #k_feature = plt.scatter(kx, ky, s=50)
+        plt.colorbar(element_scatter) # <--just for alignment
+        plt.scatter(np.array(new_kernel_list[0]), np.array(new_kernel_list[1]), s=30)
+
+        plt.savefig(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig))))
+        plt.close()
         return
     else:
         fig += 1
+        print('-> fig:', fig)
         kmeans(element_list, new_kernel_list, savepath, savename)
         kmeans_limit_group_radiu(element_list, new_kernel_list, limit_group_radiu, savepath, savename)
 
@@ -998,10 +998,9 @@ def k_mean_convectivecell_marking_v3_limit_group_kernel_radiu():
 
 # do k-mean for all field and plot, version 3 + limit_group_radiu_kmean + kernel_distance_limit (data filter, random + pick only kernel, fixed threshold = 30)
 def k_mean_convectivecell_marking_final():
-    print()#no IO
-    print('----> k_mean_convectivecell_marking_final <----')#no IO
+    #print()#no IO
+    #print('----> k_mean_convectivecell_marking_final <----')#no IO
     global fig, kernel_history
-    limit_group_radiu = 80
     limit_kernel_radiu = 20 # 80 grid points, equal to 1 lon/lat
     kernel_num = 10
     threshold = 30.0
@@ -1019,15 +1018,16 @@ def k_mean_convectivecell_marking_final():
                     kernel_list_not_ok_flag = True
         if not kernel_list_not_ok_flag:
             break
-    print('----> kernel_list', kernel_list)#no IO
+    #print('----> kernel_list', kernel_list)#no IO
     savepath = os.path.join('.', 'data_output_img', 'k_mean_final')
 
     # clean kmean old_file
     #no IO
+    '''
     old_file_list = os.listdir(savepath)
     for f in old_file_list:
         os.remove(os.path.join(savepath, f))
-
+    '''
 
     # read grd
     dbz_21_10_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211000.grd'))[0, 0, :, :]
@@ -1049,27 +1049,28 @@ def k_mean_convectivecell_marking_final():
                 if dbzfield[j, i]<65.0 and dbzfield[j, i]>threshold:
                     element_list[0].append(i)
                     element_list[1].append(j)
-        print('---> threshold, element_num, kernel_num:', threshold, len(element_list[0]), kernel_num)
+        #print('---> threshold, element_num, kernel_num:', threshold, len(element_list[0]), kernel_num)
 
         # plot basic dbz image to overlay
-        title = '{} to overlay'.format(dbzname)#no IO
+        #title = '{} to overlay'.format(dbzname)#no IO
         savename = dbzname+'__final'
-        plot_basic_contourf('dbz', dbzfield, title, savepath, savename)#no IO
+        #plot_basic_contourf('dbz', dbzfield, title, savepath, savename)#no IO
         # call get_picked_kermel
         picked_kernel_list = get_picked_kermel(element_list, kernel_list)
-        print('----> picked_kernel_list', picked_kernel_list)#no IO
+        #print('----> picked_kernel_list', picked_kernel_list)#no IO
         # call kmeans to plot
-        kmeans_limit_group_radiu(element_list, picked_kernel_list, limit_group_radiu, savepath=savepath, savename=savename)
+        kmeans(element_list, picked_kernel_list, savepath=savepath, savename=savename)
 
         # overlay
         #no IO
+        '''
         dbz_layer = plt.imread(os.path.join(savepath, savename+'.png'))
         k_layer = plt.imread(os.path.join(savepath, 'kmeans_{}_t{}.png'.format(savename, str(fig)) ))
         plt.imshow(dbz_layer, alpha=0.5)
         plt.imshow(k_layer, alpha=0.5)
-
         plt.savefig(os.path.join(savepath, 'overlay_{}'.format(savename)))
         plt.close()
+        '''
 
         fig = 0
     # nowcasting section
@@ -1087,14 +1088,18 @@ def kmean_nowcasting(dbz_21_11_obs, savepath, savename):
     # get kernel move
     kernel_list_10, kernel_list_11 = kernel_history[0], kernel_history[1]
     num_kernel = len(kernel_list_11[0])
-    print('====> kernel_list_11:', kernel_list_11) #no IO
-    print('====> kernel_list_10:', kernel_list_10) #no IO
+    #print('====> kernel_list_11:', kernel_list_11) #no IO
+    #print('====> kernel_list_10:', kernel_list_10) #no IO
     x_move, y_move = [], []
-    for i in range(num_kernel):
-        x_move.append(round(kernel_list_11[0][i] - kernel_list_10[0][i]))
-        y_move.append(round(kernel_list_11[1][i] - kernel_list_10[1][i]))
-    print('====> x_move:', x_move) #no IO
-    print('====> y_move:', y_move) #no IO
+    try:
+        for i in range(num_kernel):
+            x_move.append(round(kernel_list_11[0][i] - kernel_list_10[0][i]))
+            y_move.append(round(kernel_list_11[1][i] - kernel_list_10[1][i]))
+    except IndexError:
+        print('x_move/y_move list index out of range')
+        return np.full_like(dbz_21_11_obs, -1.0)
+    #print('====> x_move:', x_move) #no IO
+    #print('====> y_move:', y_move) #no IO
 
     dbz_21_11_obs_kmean_1h = np.full_like(dbz_21_11_obs, -1.0)
 
@@ -1132,7 +1137,7 @@ def kmean_nowcasting(dbz_21_11_obs, savepath, savename):
                     if dbz_21_11_obs_kmean_1h[new_y, new_x] < dbz_21_11_obs[j, i]: #重疊就取大者
                         dbz_21_11_obs_kmean_1h[new_y, new_x] = dbz_21_11_obs[j, i]
     # plot and save
-    plot_basic_contourf('dbz', dbz_21_11_obs_kmean_1h, title=savename, savepath=savepath, savename=savename) #no IO
+    #plot_basic_contourf('dbz', dbz_21_11_obs_kmean_1h, title=savename, savepath=savepath, savename=savename) #no IO
     return dbz_21_11_obs_kmean_1h
 
 
@@ -1446,8 +1451,12 @@ def score_fixed_data():
         plot_basic_contourf('index', index_field, index_field_name, savepath, index_field_name)
 
 # giving 2 field, compare and calculate EST score
-def est_score(nowcasting_field, observation_field):
+# !!! we want to keep origin array to plot, so use np.copy() to avoid call by reference !!!
+def TS_ETS_score(nowcasting_field_input, observation_field_input):
     threshold = 30.0
+    nowcasting_field = np.copy(nowcasting_field_input)
+    observation_field = np.copy(observation_field_input)
+
     nowcasting_field[nowcasting_field <= threshold] = 2.0
     nowcasting_field[nowcasting_field > threshold] = 1.0
     observation_field[observation_field <= threshold] = 0.5
@@ -1467,29 +1476,48 @@ def est_score(nowcasting_field, observation_field):
                 correct_negatives += 1
             else:
                 print('???', delta_field[j, i])
+    #print('->', hits, fales_alarm, misses, correct_negatives)
     abc = hits + fales_alarm + misses
     n = abc + correct_negatives
     TS = hits/abc
     ar = (hits+fales_alarm)*(hits+misses)/n**2
     ETS = ((hits-ar)/(abc-ar))
-    return ETS
+    return TS, ETS
 
 # use final_version K-mean to nowcasting, if EST > MAPLE then include to model
-def final_version_ensemble(epochs):
-    savepath = os.path.join('.', 'data_output_img', 'ensemble'),
+def final_version_ensemble(cases):
+    savepath = os.path.join('.', 'data_output_img', 'ensemble')
 
+    dbz_21_11_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[0, 0, :, :]
     dbz_21_11_obs_MAPLE_1h = read_grd(os.path.join(grd_path, 'fstdbz_202011211100.grd'))[6, 0, :, :]
     dbz_21_12_obs = read_grd(os.path.join(grd_path, 'fstdbz_202011211200.grd'))[0, 0, :, :]
-    MAPLE_EST = est_score(dbz_21_11_obs_MAPLE_1h, dbz_21_12_obs)
-    print('====> MAPLE_EST:', MAPLE_EST)
 
-    for i in range(epochs):
+    persistent_TS, persistent_ETS = TS_ETS_score(dbz_21_11_obs, dbz_21_12_obs)
+    MAPLE_TS, MAPLE_ETS = TS_ETS_score(dbz_21_11_obs_MAPLE_1h, dbz_21_12_obs)
+    print('====> persistent_TS, persistent_ETS:', persistent_TS, persistent_ETS)
+    print('====> MAPLE_TS, MAPLE_ETS:', MAPLE_TS, MAPLE_ETS)
+
+    num_of_good_cases = 0
+    while num_of_good_cases < cases:
         dbz_21_11_obs_kmean_1h = k_mean_convectivecell_marking_final()
-        kmean_EST = est_score(dbz_21_11_obs_kmean_1h, dbz_21_12_obs)
-        plot_basic_contourf('dbz', dbz_21_11_obs_kmean_1h, 'dbz_21_11_obs_kmean_1h_{}'.format(str(i)), savepath, 'dbz_21_11_obs_kmean_1h_{}'.format(str(i)))
-        print('====> kmean_EST:', kmean_EST)
+        kmean_TS, kmean_ETS = TS_ETS_score(dbz_21_11_obs_kmean_1h, dbz_21_12_obs)
+        print('====> kmean_TS, kmean_ETS:', kmean_TS, kmean_ETS)
 
-    #TODO: save img if kmean_EST > MAPLE_EST
+        #if kmean_ETS > persistent_ETS and kmean_ETS > MAPLE_ETS:
+        if kmean_ETS > MAPLE_ETS:
+            savename = 'dbz_21_11_obs_kmean_1h_{}'.format(str(num_of_good_cases))
+            title='ETS\nkmean:{:.3f} persistent:{:.3f} MAPLE:{:.3f}'.format(kmean_ETS, persistent_ETS, MAPLE_ETS)
+            print('==)', savepath, savename, title)
+
+            plot_basic_contourf(
+                dataname='dbz',
+                datafield=dbz_21_11_obs_kmean_1h,
+                title=title,
+                savepath=savepath,
+                savename=savename,
+            )
+            num_of_good_cases += 1
+
 
 if __name__ == '__main__':
     # data_source : ..
@@ -1498,18 +1526,18 @@ if __name__ == '__main__':
     #create_NCDR_maple_img(delete_png_flag=False)
     #compare_forecasts_effectiveness()
 
-    k_mean_convectivecell_marking_v1()
-    k_mean_convectivecell_marking_v2()
-    k_mean_convectivecell_marking_v3()
-    k_mean_convectivecell_marking_v4()
+    #k_mean_convectivecell_marking_v1()
+    #k_mean_convectivecell_marking_v2()
+    #k_mean_convectivecell_marking_v3()
+    #k_mean_convectivecell_marking_v4()
 
     #k_mean_convectivecell_marking_v3_adjust_threshold()
-    k_mean_convectivecell_marking_v3_limit_group_radiu()
-    k_mean_convectivecell_marking_v3_limit_kernel_radiu()
-    k_mean_convectivecell_marking_v3_limit_group_kernel_radiu()
-    k_mean_convectivecell_marking_final()
+    #k_mean_convectivecell_marking_v3_limit_group_radiu() # kmeans_limit_group_radiu problem, don't use
+    #k_mean_convectivecell_marking_v3_limit_kernel_radiu()
+    #k_mean_convectivecell_marking_v3_limit_group_kernel_radiu() # kmeans_limit_group_radiu problem, don't use
+    #k_mean_convectivecell_marking_final()
 
-    #final_version_ensemble(epochs=20)
+    final_version_ensemble(cases=20)
 
     #pearson()
     #moment()
