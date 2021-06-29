@@ -1,0 +1,48 @@
+----> kernel_list [[421, 595, 788, 376, 413, 438, 255, 529, 313, 62], [505, 97, 414, 845, 753, 166, 313, 425, 584, 737]]
+
+---> threshold, element_num, kernel_num: 25.0 6130 10
+----> picked_kernel_list [[542, 732, 402, 334, 586], [560, 507, 275, 308, 490]]
+---> threshold, element_num, kernel_num: 30.0 3731 10
+----> picked_kernel_list [[544, 708, 387, 335, 589], [560, 502, 276, 311, 495]]
+---> threshold, element_num, kernel_num: 35.0 1889 10
+----> picked_kernel_list [[702, 590], [510, 500]]
+---> threshold, element_num, kernel_num: 40.0 568 10
+----> picked_kernel_list [[720, 590], [556, 505]]
+---> threshold, element_num, kernel_num: 45.0 84 10
+----> picked_kernel_list [[597], [510]]
+---> threshold, element_num, kernel_num: 50.0 3 10
+----> picked_kernel_list [[613], [519]]
+
+----> kernel_history: [[[569, 750, 534, 347, 619], [498, 518, 381, 302, 516]], [[570, 620 , 516, 348, 571], [514, 514, 354, 302, 440]], [[596, 553], [513, 410]], [[720, 590], [556, 505]], [[597], [510]], [[613], [519]]]
+
+
+---> threshold, element_num, kernel_num: 25.0 5457 10
+----> picked_kernel_list [[537, 733, 439, 327, 589], [563, 524, 274, 307, 495]]
+---> threshold, element_num, kernel_num: 30.0 3299 10
+----> picked_kernel_list [[765, 439, 325, 592], [527, 274, 307, 500]]
+---> threshold, element_num, kernel_num: 35.0 1516 10
+----> picked_kernel_list [[331, 593], [307, 505]]
+---> threshold, element_num, kernel_num: 40.0 451 10
+----> picked_kernel_list [[594], [510]]
+---> threshold, element_num, kernel_num: 45.0 32 10
+----> picked_kernel_list [[603], [516]]
+---> threshold, element_num, kernel_num: 50.0 0 10
+----> picked_kernel_list [[], []]
+
+----> kernel_history: [[[573, 623, 497, 327, 570], [511, 516, 343, 307, 438]], [[765, 556, 329, 598], [527, 417, 305, 513]], [[470, 595], [348, 508]], [[594], [510]], [[603], [516]], [[], []]]
+
+
+---> threshold, element_num, kernel_num: 25.0 5076 10
+----> picked_kernel_list [[538, 702, 462, 310, 589], [562, 510, 271, 306, 494]]
+---> threshold, element_num, kernel_num: 30.0 2934 10
+----> picked_kernel_list [[701, 456, 308, 591], [507, 272, 305, 498]]
+---> threshold, element_num, kernel_num: 35.0 1505 10
+----> picked_kernel_list [[688, 449, 308, 595], [504, 273, 306, 505]]
+---> threshold, element_num, kernel_num: 40.0 455 10
+----> picked_kernel_list [[712, 596], [503, 509]]
+---> threshold, element_num, kernel_num: 45.0 48 10
+----> picked_kernel_list [[601], [509]]
+---> threshold, element_num, kernel_num: 50.0 2 10
+----> picked_kernel_list [[601], [521]]
+
+----> kernel_history: [[[577, 631, 490, 310, 569], [514, 513, 335, 306, 435]], [[611, 529, 354, 592], [468, 378, 295, 517]], [[612, 526, 308, 596], [468, 371, 306, 516]], [[712, 596], [503, 509]], [[601], [509]], [[601], [521]]]
